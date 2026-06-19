@@ -62,6 +62,8 @@ description: 将已经作答、涂写或批改过的试卷与练习册照片重�
 ### 3. 生成打印稿
 
 - 默认输出单面 A4；用户明确要求时再生成 A3 双面或折叠版。
+- 默认把最终 PDF 写入 Skill 根目录的 `outPdfFile/`，不要写入会话临时目录或下载目录。
+- 生成代码必须通过项目相对路径解析输出位置，禁止写死用户名或 `/Users/...` 绝对路径。
 - 优先使用 ReportLab 等矢量 PDF 工具，不要用生成式图片承载中文题目。
 - 嵌入中文字体和特殊符号字体，避免换电脑后出现方框字。
 - 用表格或固定列宽完成选择题、判断题和并排小题；禁止依靠连续空格控制位置。
@@ -79,6 +81,20 @@ description: 将已经作答、涂写或批改过的试卷与练习册照片重�
 - 可填写矢量方框：边长至少 3 mm
 
 生成 PDF 时，按需读取 [排版与绘图模式](references/layout-patterns.md)。
+
+使用统一路径模块确定文件名并自动创建输出目录：
+
+```python
+from output_paths import output_pdf_path
+
+OUTPUT_PDF = output_pdf_path("<本卷文件名>.pdf")
+```
+
+当生成脚本不在 Skill 的 `scripts/` 目录时，先执行以下命令取得路径，不要自行拼接绝对路径：
+
+```bash
+OUTPUT_PDF="$(python3 scripts/output_paths.py '<本卷文件名>.pdf')"
+```
 
 ### 4. 执行闭环验收
 
@@ -99,12 +115,19 @@ description: 将已经作答、涂写或批改过的试卷与练习册照片重�
 使用通用校验脚本检查 PDF：
 
 ```bash
-python3 scripts/validate_exam_pdf.py <试卷.pdf> \
-  --expected-pages 4 \
-  --required '综合素养通关' \
-  --forbidden '学生姓名' \
+EXPECTED_PAGES="<按本卷实际页数填写>"
+REQUIRED_TEXT="<从本卷选择一条关键题干>"
+FORBIDDEN_TEXT="<本卷中必须移除的学生信息或答案>"
+OUTPUT_PDF="$(python3 scripts/output_paths.py '<本卷文件名>.pdf')"
+
+python3 scripts/validate_exam_pdf.py "$OUTPUT_PDF" \
+  --expected-pages "$EXPECTED_PAGES" \
+  --required "$REQUIRED_TEXT" \
+  --forbidden "$FORBIDDEN_TEXT" \
   --render-dir /tmp/exam-render
 ```
+
+每次根据当前试卷填写变量，禁止沿用上一份试卷的页数、卷名或题干。
 
 交付前完整执行 [验收清单](references/acceptance-checklist.md)。
 
@@ -134,7 +157,7 @@ python3 scripts/validate_exam_pdf.py <试卷.pdf> \
 
 交付时提供：
 
-1. 可打印 PDF。
+1. `outPdfFile/` 中的可打印 PDF。
 2. 页数、纸张尺寸和字体嵌入检查结果。
 3. 已完成的内容与版式验收摘要。
 4. 未解决的歧义清单；若为空，明确写“无待确认项”。

@@ -9,11 +9,13 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
 try:
     from pypdf import PdfReader
+    from pypdf.generic import ContentStream
 except ImportError:
     print("错误：缺少 pypdf。请使用 Codex 文档运行时，或安装 pypdf 后重试。", file=sys.stderr)
     raise SystemExit(2)
@@ -48,23 +50,115 @@ def page_size_is_a4(page: Any, tolerance: float = 2.0) -> bool:
     return portrait or landscape
 
 
-def embedded_fonts(reader: PdfReader) -> set[str]:
-    names: set[str] = set()
+def font_is_embedded(font: Any) -> bool:
+    if font.get("/Subtype") == "/Type3":
+        # Type 3 字形程序直接存放在 PDF 内，不依赖外部字体文件。
+        return True
+    descendants = font.get("/DescendantFonts") or []
+    candidates = [font, *[item.get_object() for item in descendants]]
+    for candidate in candidates:
+        descriptor = candidate.get("/FontDescriptor")
+        if not descriptor:
+            continue
+        descriptor = descriptor.get_object()
+        if any(key in descriptor for key in ("/FontFile", "/FontFile2", "/FontFile3")):
+            return True
+    return False
+
+
+def resolve_object(value: Any) -> Any:
+    return value.get_object() if hasattr(value, "get_object") else value
+
+
+def collect_used_fonts(
+    stream: Any,
+    resources: Any,
+    reader: PdfReader,
+    embedded: set[str],
+    unembedded: set[str],
+    visited: set[int],
+    initial_font: tuple[str, bool] | None = None,
+) -> None:
+    if stream is None:
+        return
+
+    stream = resolve_object(stream)
+    marker = id(stream)
+    if marker in visited:
+        return
+    visited.add(marker)
+
+    resources = resolve_object(resources) if resources else {}
+    fonts = resolve_object(resources.get("/Font") or {})
+    xobjects = resolve_object(resources.get("/XObject") or {})
+
+    try:
+        operations = ContentStream(stream, reader).operations
+    except Exception as error:
+        raise ValueError(f"无法解析 PDF 内容流以检查字体：{error}") from error
+
+    current_font = initial_font
+    font_stack: list[tuple[str, bool] | None] = []
+
+    def resolve_font(resource_name: Any) -> tuple[str, bool]:
+        reference = fonts.get(resource_name)
+        if reference is None:
+            return f"未解析字体资源 {resource_name}", False
+        font = resolve_object(reference)
+        name = str(font.get("/BaseFont", resource_name))
+        return name, font_is_embedded(font)
+
+    def record_current_font() -> None:
+        if current_font is None:
+            unembedded.add("文字绘制时未解析到当前字体")
+            return
+        name, is_embedded = current_font
+        target = embedded if is_embedded else unembedded
+        target.add(name)
+
+    for operands, operator in operations:
+        if operator == b"Tf" and operands:
+            current_font = resolve_font(operands[0])
+        elif operator in (b"Tj", b"TJ", b"'", b'"'):
+            record_current_font()
+        elif operator == b"q":
+            font_stack.append(current_font)
+        elif operator == b"Q" and font_stack:
+            current_font = font_stack.pop()
+        elif operator == b"Do" and operands:
+            reference = xobjects.get(operands[0])
+            if reference is None:
+                continue
+            xobject = resolve_object(reference)
+            if xobject.get("/Subtype") != "/Form":
+                continue
+            nested_resources = xobject.get("/Resources") or resources
+            collect_used_fonts(
+                xobject,
+                nested_resources,
+                reader,
+                embedded,
+                unembedded,
+                visited,
+                current_font,
+            )
+
+    visited.remove(marker)
+
+
+def font_embedding_report(reader: PdfReader) -> tuple[set[str], set[str]]:
+    embedded: set[str] = set()
+    unembedded: set[str] = set()
     for page in reader.pages:
-        resources = page.get("/Resources") or {}
-        fonts = resources.get("/Font") or {}
-        for reference in fonts.values():
-            font = reference.get_object()
-            descendants = font.get("/DescendantFonts") or []
-            candidates = [font, *[item.get_object() for item in descendants]]
-            for candidate in candidates:
-                descriptor = candidate.get("/FontDescriptor")
-                if not descriptor:
-                    continue
-                descriptor = descriptor.get_object()
-                if any(key in descriptor for key in ("/FontFile", "/FontFile2", "/FontFile3")):
-                    names.add(str(candidate.get("/BaseFont", "unknown")))
-    return names
+        collect_used_fonts(
+            page.get_contents(),
+            page.get("/Resources") or {},
+            reader,
+            embedded,
+            unembedded,
+            set(),
+        )
+    return embedded, unembedded
 
 
 def contains_javascript(reader: PdfReader) -> bool:
@@ -83,15 +177,16 @@ def contains_javascript(reader: PdfReader) -> bool:
     return False
 
 
-def render_pdf(pdf: Path, output_dir: Path, dpi: int) -> list[str]:
+def render_pdf(pdf: Path, output_dir: Path, dpi: int) -> tuple[list[str], Path]:
     executable = shutil.which("pdftoppm")
     if not executable:
         raise RuntimeError("找不到 pdftoppm。请安装 Poppler，或把其 bin 目录加入 PATH。")
     output_dir.mkdir(parents=True, exist_ok=True)
-    prefix = output_dir / "page"
+    run_dir = Path(tempfile.mkdtemp(prefix=f"{pdf.stem}-", dir=str(output_dir)))
+    prefix = run_dir / "page"
     command = [executable, "-png", "-r", str(dpi), str(pdf), str(prefix)]
     subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-    return sorted(str(path) for path in output_dir.glob("page-*.png"))
+    return sorted(str(path) for path in run_dir.glob("page-*.png")), run_dir
 
 
 def main() -> int:
@@ -99,6 +194,7 @@ def main() -> int:
     failures: list[str] = []
     warnings: list[str] = []
     rendered: list[str] = []
+    actual_render_dir: Path | None = None
 
     if not args.pdf.is_file():
         print(f"错误：文件不存在：{args.pdf}", file=sys.stderr)
@@ -130,16 +226,18 @@ def main() -> int:
     if forbidden_present:
         failures.append(f"发现禁止文字：{forbidden_present}")
 
-    fonts = embedded_fonts(reader)
-    if not fonts:
-        failures.append("未检测到嵌入字体")
+    fonts, unembedded_fonts = font_embedding_report(reader)
+    if not fonts and not unembedded_fonts:
+        failures.append("未检测到字体资源")
+    if unembedded_fonts:
+        failures.append(f"发现未嵌入字体：{sorted(unembedded_fonts)}")
 
     if contains_javascript(reader):
         failures.append("PDF 包含 JavaScript")
 
     if args.render_dir:
         try:
-            rendered = render_pdf(args.pdf, args.render_dir, args.render_dpi)
+            rendered, actual_render_dir = render_pdf(args.pdf, args.render_dir, args.render_dpi)
         except Exception as error:
             failures.append(f"渲染失败：{error}")
         if rendered and len(rendered) != page_count:
@@ -151,9 +249,11 @@ def main() -> int:
         "pdf": str(args.pdf.resolve()),
         "pages": page_count,
         "embedded_fonts": sorted(fonts),
+        "unembedded_fonts": sorted(unembedded_fonts),
         "missing_required": missing,
         "forbidden_present": forbidden_present,
         "rendered_files": rendered,
+        "render_dir": str(actual_render_dir) if actual_render_dir else None,
         "warnings": warnings,
         "failures": failures,
         "sha256": digest,
@@ -166,7 +266,7 @@ def main() -> int:
         print(f"页数：{page_count}")
         print(f"嵌入字体：{len(fonts)} 组")
         if rendered:
-            print(f"渲染文件：{len(rendered)} 张，目录 {args.render_dir}")
+            print(f"渲染文件：{len(rendered)} 张，目录 {actual_render_dir}")
         print(f"SHA-256：{digest}")
         for warning in warnings:
             print(f"警告：{warning}")

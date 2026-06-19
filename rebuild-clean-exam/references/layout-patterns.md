@@ -24,11 +24,14 @@ def symbol(char, size=15):
 用固定列宽表格，不要用连续空格：
 
 ```python
-from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, Table, TableStyle
 
-def subitem_row(items, style, widths):
-    table = Table([[Paragraph(x, style) for x in items]], colWidths=widths)
+def subitem_row(items, style, available_width):
+    column_width = available_width / len(items)
+    table = Table(
+        [[Paragraph(x, style) for x in items]],
+        colWidths=[column_width] * len(items),
+    )
     table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 7),
@@ -37,11 +40,11 @@ def subitem_row(items, style, widths):
     ]))
     return table
 
-# 两项题
-subitem_row(["120秒=（ ）分", "75分=（ ）时（ ）分"], style, [90*mm, 90*mm])
+# available_width 使用文档实际可用宽度，例如 SimpleDocTemplate 的 doc.width。
 
-# 三项题
-subitem_row(["8490>□532", "4□52<4542", "39□5<3946"], style, [60*mm]*3)
+# 两项题和三项题使用同一个函数，不写死毫米数。
+subitem_row(["<小题1>", "<小题2>"], style, available_width)
+subitem_row(["<小题1>", "<小题2>", "<小题3>"], style, available_width)
 ```
 
 ## 选择题与判断题
