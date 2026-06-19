@@ -1,0 +1,4 @@
+interface:
+  display_name: "干净试卷重建"
+  short_description: "把已作答试卷照片重建为准确、整洁、可再次打印的PDF试卷"
+  default_prompt: "使用 $rebuild-clean-exam 将这些已作答试卷照片重建为可重新作答的干净 A4 PDF。"
