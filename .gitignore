@@ -1,0 +1,13 @@
+.DS_Store
+**/.DS_Store
+
+# Obsidian 工作区状态(不入库,跟着用户走)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+
+# 依赖
+node_modules/
+
+# rebuild-clean-exam skill 的输出目录
+rebuild-clean-exam/outPdfFile/
