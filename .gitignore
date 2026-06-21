@@ -11,3 +11,7 @@ node_modules/
 
 # rebuild-clean-exam skill 的输出目录
 rebuild-clean-exam/outPdfFile/
+
+# 错题临时区:孩子作业拍照、Claude 生成的中间产物暂存,归档完成后清空
+# 任何路径下的 temp/ 都不入库,文件就是中间态,不该有 git 历史
+mistakeNote/**/temp/

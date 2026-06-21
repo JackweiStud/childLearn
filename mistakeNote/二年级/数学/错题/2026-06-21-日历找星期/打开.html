@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日历找规律</title>
+<style>
+:root {
+  --paper: #F5F7FB;
+  --surface: #FFFFFF;
+  --ink: #15233B;
+  --muted: #62718B;
+  --line: #DBE4F0;
+  --primary: #2F7DF6;
+  --primary-deep: #1D4ED8;
+  --primary-bg: #DCEAFE;
+  --accent: #F59E0B;
+  --accent-bg: #FEF3D6;
+  --accent-deep: #B45309;
+  --ok: #16A34A;
+  --ok-bg: #DCFCE7;
+  --pink: #EC4899;
+  --pink-bg: #FBDCEC;
+  --pink-deep: #BE185D;
+  --warn: #DC2626;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(circle at 0% 0%, #DCEAFE 0, rgba(220,234,254,0) 35%),
+    radial-gradient(circle at 100% 8%, #FEF3D6 0, rgba(254,243,214,0) 38%),
+    var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  padding: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app { max-width: 760px; margin: 0 auto; }
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 2px solid var(--line);
+  font-size: 32px;
+  box-shadow: 0 6px 16px rgba(47,125,246,.12);
+  flex: none;
+}
+
+.header h1 {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: .3px;
+}
+
+.header p {
+  margin-top: 3px;
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  flex: 1;
+  padding: 12px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: .15s;
+}
+
+.tab.on {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+  box-shadow: 0 6px 16px rgba(21,35,59,.22);
+}
+
+.page.hidden { display: none; }
+
+/* Phase indicator */
+.phases {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.phase {
+  flex: 1;
+  padding: 9px 4px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+}
+
+.phase.on {
+  border-color: var(--primary);
+  color: var(--primary-deep);
+  background: var(--primary-bg);
+}
+
+.phase.done {
+  border-color: #C8E6CF;
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+/* Progress bar */
+.progress-bar {
+  margin-bottom: 12px;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.progress-bar .count {
+  font-size: 16px;
+  color: var(--primary-deep);
+  white-space: nowrap;
+}
+
+.progress-bar .bar {
+  flex: 1;
+  height: 6px;
+  background: var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar .fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.4s ease;
+  border-radius: 3px;
+}
+
+/* Calendar */
+.calendar {
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.cal-row.header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  max-width: 420px;
+  margin: 0 auto 8px;
+}
+
+.cal-header-cell {
+  text-align: center;
+  font-size: clamp(13px, 3.5vw, 15px);
+  font-weight: 800;
+  color: var(--muted);
+  padding: 6px 0;
+  border-radius: 8px;
+  background: #F5F7FB;
+}
+
+.cal-header-cell.highlight {
+  color: var(--primary-deep);
+  background: var(--primary-bg);
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.cal-cell {
+  aspect-ratio: 1;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: clamp(15px, 4vw, 19px);
+  font-weight: 800;
+  color: var(--ink);
+  background: #fff;
+  position: relative;
+  transition: background-color 0.25s, border-color 0.25s;
+}
+
+.cal-cell.highlight-col {
+  background: var(--primary-bg);
+  border-color: #BFDBFE;
+}
+
+.cal-cell.empty { color: transparent; }
+
+.cal-cell.filled {
+  border-color: var(--ink);
+}
+
+.cal-cell.highlight-col.filled {
+  background: var(--primary-bg);
+  border-color: var(--primary);
+  color: var(--primary-deep);
+}
+
+.cal-cell.just-added {
+  animation: justAdded 0.6s ease-out both;
+  z-index: 2;
+}
+
+@keyframes justAdded {
+  0% { transform: scale(0.3); opacity: 0; box-shadow: 0 0 0 0 rgba(252,211,77,0.85); }
+  55% { transform: scale(1.2); box-shadow: 0 0 0 8px rgba(252,211,77,0.45); }
+  100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(252,211,77,0); }
+}
+
+.cal-cell.pulse {
+  animation: pulse 0.8s ease-in-out both;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(47,125,246,0.32); }
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.btn {
+  font-family: inherit;
+  font-weight: 800;
+  border-radius: 14px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  padding: 14px 18px;
+  font-size: 16px;
+  transition: .15s;
+}
+
+.btn.primary {
+  flex: 1;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(47,125,246,.3);
+}
+
+.btn.primary:active { transform: translateY(1px); }
+.btn.primary:disabled { background: #B0BCCF; cursor: default; box-shadow: none; }
+
+.btn.ghost {
+  background: #fff;
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.btn.ghost:disabled { opacity: .4; cursor: default; }
+
+.btn.block { width: 100%; }
+
+.btn.small { padding: 9px 14px; font-size: 14px; }
+
+/* Narration */
+.narration {
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.narration.milestone {
+  border-color: var(--accent);
+  background: linear-gradient(0deg, var(--accent-bg), #fff 80%);
+}
+
+.narration.discovery {
+  border-color: var(--pink);
+  background: linear-gradient(0deg, var(--pink-bg), #fff 65%);
+}
+
+.nar-icon { font-size: 27px; flex: none; line-height: 1; }
+
+.nar-title {
+  font-size: 17px;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+
+.nar-text {
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: #2A3A55;
+}
+
+.nar-text b { color: var(--pink-deep); }
+
+/* Questions */
+.question-card {
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 12px;
+  transition: .25s;
+}
+
+.question-card.solved {
+  border-color: #C8E6CF;
+  background: linear-gradient(0deg, var(--ok-bg), #fff 80%);
+}
+
+.q-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary-deep);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.q-text {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.q-text b { color: var(--primary-deep); }
+
+.q-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.q-input {
+  font-family: inherit;
+  width: 96px;
+  padding: 11px 12px;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.q-input:focus { outline: none; border-color: var(--primary); }
+.q-input:disabled { background: var(--ok-bg); border-color: #C8E6CF; color: var(--ok); }
+
+.q-unit { font-size: 15px; color: var(--muted); font-weight: 700; }
+
+.q-msg { margin-top: 9px; font-size: 14px; font-weight: 700; }
+.q-msg.ok { color: var(--ok); }
+.q-msg.no { color: var(--warn); }
+
+/* Win box */
+.win {
+  background: linear-gradient(135deg, var(--accent-bg), var(--pink-bg));
+  border: 2px solid var(--pink);
+  border-radius: 18px;
+  padding: 18px;
+  text-align: center;
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.75;
+}
+
+.win .big {
+  font-size: 23px;
+  color: var(--pink-deep);
+  display: block;
+  margin: 6px 0;
+}
+
+.win .tip {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* Practice problem card */
+.prob-card {
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  padding: 16px;
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.prob-tag {
+  position: absolute;
+  top: -11px;
+  left: 16px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+
+.prob-text {
+  margin-top: 4px;
+  font-size: 17px;
+  line-height: 1.75;
+  font-weight: 600;
+}
+
+.hl { color: var(--primary-deep); font-weight: 800; }
+
+@media (max-width: 460px) {
+  .header h1 { font-size: 21px; }
+  .header p { font-size: 12.5px; }
+  .calendar { padding: 10px; }
+  .cal-grid { gap: 4px; }
+  .cal-row.header { gap: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-cell.just-added, .cal-cell.pulse { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="logo">📅</div>
+    <div>
+      <h1>日历找规律</h1>
+      <p>6 月 1 日是星期一,6 月 30 日是星期几?6 月份里有几个星期一?</p>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="learn">👀 跟我学</button>
+    <button class="tab" data-tab="practice">✏️ 练一练</button>
+  </div>
+
+  <!-- ============== 跟我学 ============== -->
+  <div class="page" id="page-learn">
+    <div class="phases">
+      <div class="phase on" id="phase-fill">① 填日历</div>
+      <div class="phase" id="phase-answer">② 找答案</div>
+      <div class="phase" id="phase-discover">③ 发现规律</div>
+    </div>
+
+    <div class="progress-bar">
+      <span>已填</span>
+      <span class="count"><span id="cur-day">0</span> / 30 天</span>
+      <div class="bar"><div class="fill" id="bar-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="calendar">
+      <div class="cal-row header" id="cal-header-learn"></div>
+      <div class="cal-grid" id="grid-learn"></div>
+    </div>
+
+    <div class="controls" id="controls-fill">
+      <button class="btn primary" id="btn-next">下一天 →</button>
+      <button class="btn ghost" id="btn-fill-all">全部填完</button>
+    </div>
+
+    <div class="narration" id="narration">
+      <span class="nar-icon">📖</span>
+      <div>
+        <div class="nar-title">先看题目</div>
+        <div class="nar-text">这是 6 月份的空日历。6 月 1 日是星期一,我们要找出 6 月 30 日是星期几、6 月份里有几个星期一。<br><br>点 <b style="color:var(--primary-deep)">"下一天 →"</b> 开始一天一天填上去。</div>
+      </div>
+    </div>
+
+    <div id="questions" style="display:none;">
+      <div class="question-card" id="q1">
+        <div class="q-title">问题 1</div>
+        <div class="q-text">看你填好的日历:<b>6 月 30 日</b>是星期几?</div>
+        <div class="q-row">
+          <span class="q-unit">星期</span>
+          <select class="q-input" id="q1-input">
+            <option value="">?</option>
+            <option value="1">一</option>
+            <option value="2">二</option>
+            <option value="3">三</option>
+            <option value="4">四</option>
+            <option value="5">五</option>
+            <option value="6">六</option>
+            <option value="7">日</option>
+          </select>
+          <button class="btn primary small" id="q1-check">检查</button>
+        </div>
+        <div class="q-msg" id="q1-msg"></div>
+      </div>
+      <div class="question-card" id="q2" style="display:none;">
+        <div class="q-title">问题 2</div>
+        <div class="q-text">数一数蓝色那一列(<b>星期一</b>),一共有几个数字?</div>
+        <div class="q-row">
+          <input type="number" class="q-input" id="q2-input" placeholder="?" min="0" max="10">
+          <span class="q-unit">个</span>
+          <button class="btn primary small" id="q2-check">检查</button>
+        </div>
+        <div class="q-msg" id="q2-msg"></div>
+      </div>
+    </div>
+
+    <div id="discovery" style="display:none;">
+      <div class="narration discovery">
+        <span class="nar-icon">💡</span>
+        <div>
+          <div class="nar-title">小发现:7 天周期</div>
+          <div class="nar-text">看星期一那一列:<b>1、8、15、22、29</b>。<br>每两个相邻的星期一中间差几天?——<b>差 7 天!</b><br><br>这就是"一星期 = 7 天"的循环。以后碰到"第几天是星期几"的题,数 7 就对了。</div>
+        </div>
+      </div>
+      <div class="win">
+        🎉 你掌握了!
+        <span class="big">6 月 30 日 = 星期二</span>
+        <span class="big">6 月有 5 个星期一</span>
+        <span class="tip">秘诀:周一站在 1、8、15、22、29 —— 每隔 7 天来一次</span>
+        <button class="btn primary block" style="margin-top:14px;" onclick="document.querySelector('[data-tab=practice]').click()">去练一练 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== 练一练 ============== -->
+  <div class="page hidden" id="page-practice">
+    <div class="prob-card">
+      <div class="prob-tag">练习题</div>
+      <div class="prob-text" id="prob-text"></div>
+    </div>
+
+    <div class="progress-bar">
+      <span>已填</span>
+      <span class="count"><span id="p-cur-day">0</span> / <span id="p-total-day">30</span> 天</span>
+      <div class="bar"><div class="fill" id="p-bar-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="calendar">
+      <div class="cal-row header" id="cal-header-practice"></div>
+      <div class="cal-grid" id="grid-practice"></div>
+    </div>
+
+    <div class="controls" id="p-controls-fill">
+      <button class="btn primary" id="p-btn-next">下一天 →</button>
+      <button class="btn ghost" id="p-btn-fill-all">全部填完</button>
+    </div>
+
+    <div id="p-questions" style="display:none;">
+      <div class="question-card" id="p-q1">
+        <div class="q-title">问题 1</div>
+        <div class="q-text" id="p-q1-text"></div>
+        <div class="q-row">
+          <span class="q-unit">星期</span>
+          <select class="q-input" id="p-q1-input">
+            <option value="">?</option>
+            <option value="1">一</option>
+            <option value="2">二</option>
+            <option value="3">三</option>
+            <option value="4">四</option>
+            <option value="5">五</option>
+            <option value="6">六</option>
+            <option value="7">日</option>
+          </select>
+          <button class="btn primary small" id="p-q1-check">检查</button>
+        </div>
+        <div class="q-msg" id="p-q1-msg"></div>
+      </div>
+      <div class="question-card" id="p-q2" style="display:none;">
+        <div class="q-title">问题 2</div>
+        <div class="q-text" id="p-q2-text"></div>
+        <div class="q-row">
+          <input type="number" class="q-input" id="p-q2-input" placeholder="?" min="0" max="10">
+          <span class="q-unit">个</span>
+          <button class="btn primary small" id="p-q2-check">检查</button>
+        </div>
+        <div class="q-msg" id="p-q2-msg"></div>
+      </div>
+    </div>
+
+    <div id="p-win" style="display:none;">
+      <div class="win">
+        🎉 答对了!
+        <span class="big" id="p-win-text"></span>
+        <button class="btn primary block" id="p-next-prob" style="margin-top:14px;">再来一题 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const dayNames = ['一','二','三','四','五','六','日'];
+
+/* ====== Tab ====== */
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+    document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+    document.getElementById('page-' + t.dataset.tab).classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+
+/* ====== Grid utilities ====== */
+function buildHeader(headerEl, highlightCol) {
+  headerEl.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const d = document.createElement('div');
+    d.className = 'cal-header-cell' + (i === highlightCol ? ' highlight' : '');
+    d.textContent = dayNames[i];
+    headerEl.appendChild(d);
+  }
+}
+
+function buildGrid(gridEl, startCol, totalDays, highlightCol) {
+  const rows = Math.ceil((startCol + totalDays) / 7);
+  gridEl.innerHTML = '';
+  for (let i = 0; i < rows * 7; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell empty';
+    const col = i % 7;
+    if (col === highlightCol) cell.classList.add('highlight-col');
+    gridEl.appendChild(cell);
+  }
+}
+
+function fillCell(gridEl, dayIndex, startCol) {
+  const cellIndex = startCol + (dayIndex - 1);
+  const cells = gridEl.querySelectorAll('.cal-cell');
+  if (cellIndex >= cells.length) return;
+  const cell = cells[cellIndex];
+  cell.classList.remove('empty');
+  cell.classList.add('filled');
+  cell.textContent = dayIndex;
+  // Remove just-added from siblings
+  gridEl.querySelectorAll('.cal-cell.just-added').forEach(c => c.classList.remove('just-added'));
+  cell.classList.add('just-added');
+  setTimeout(() => cell.classList.remove('just-added'), 600);
+}
+
+function updatePhase(prefix, phase) {
+  // for learn only
+  if (prefix !== '') return;
+  ['fill','answer','discover'].forEach(p => {
+    document.getElementById('phase-' + p).classList.remove('on','done');
+  });
+  if (phase === 'fill') document.getElementById('phase-fill').classList.add('on');
+  else if (phase === 'answer') {
+    document.getElementById('phase-fill').classList.add('done');
+    document.getElementById('phase-answer').classList.add('on');
+  } else if (phase === 'discover') {
+    document.getElementById('phase-fill').classList.add('done');
+    document.getElementById('phase-answer').classList.add('done');
+    document.getElementById('phase-discover').classList.add('on');
+  }
+}
+
+function setNarration(icon, title, text, klass='') {
+  const el = document.getElementById('narration');
+  el.className = 'narration' + (klass ? ' ' + klass : '');
+  el.innerHTML = `
+    <span class="nar-icon">${icon}</span>
+    <div>
+      <div class="nar-title">${title}</div>
+      <div class="nar-text">${text}</div>
+    </div>
+  `;
+}
+
+/* ====== Learn ====== */
+const learnState = { curDay: 0, total: 30, startCol: 0 };
+const gridLearn = document.getElementById('grid-learn');
+buildHeader(document.getElementById('cal-header-learn'), 0);
+buildGrid(gridLearn, 0, 30, 0);
+
+function updateLearnProgress() {
+  document.getElementById('cur-day').textContent = learnState.curDay;
+  document.getElementById('bar-fill').style.width = (learnState.curDay / learnState.total * 100) + '%';
+}
+
+function advanceLearn() {
+  if (learnState.curDay >= learnState.total) return;
+  learnState.curDay++;
+  fillCell(gridLearn, learnState.curDay, 0);
+  updateLearnProgress();
+  const d = learnState.curDay;
+  if (d === 1) {
+    setNarration('📌', '6 月 1 日 = 星期一',
+      '1 落在了星期一那一列(蓝色那列)的第一格。继续往下,看看会怎么样。');
+  } else if (d === 7) {
+    setNarration('🎯', '第一周满了!',
+      '从 1 到 7,一周正好 7 天。下一天会落到哪儿?试试看。', 'milestone');
+  } else if (d === 8) {
+    setNarration('🔁', '看!8 号又是星期一',
+      '一星期过去了,星期一又出现了——这就是日历的"<b>7 天周期</b>"。继续填,数数还会出现几次星期一。', 'milestone');
+  } else if (d === 15) {
+    setNarration('👀', '两周过去了',
+      '星期一已经出现了 1、8、15。它们中间各差几天?记着这个发现。');
+  } else if (d === 22) {
+    setNarration('🌟', '三周了,星期一又来',
+      '1、8、15、22。规律越来越明显了。');
+  } else if (d === 29) {
+    setNarration('🎁', '29 号又是星期一!',
+      '1、8、15、22、29——这都是星期一。再填一天就到 30 啦。', 'milestone');
+  } else if (d === 30) {
+    setNarration('✅', '30 天全部填完!',
+      '现在认真看你填好的日历:<b>30 号落在哪一列?蓝色那一列有几个数字?</b>下面回答两个问题。', 'milestone');
+    enterAnswer();
+  }
+}
+
+function fillAllLearn() {
+  document.getElementById('btn-next').disabled = true;
+  document.getElementById('btn-fill-all').disabled = true;
+  const tick = () => {
+    if (learnState.curDay >= learnState.total) return;
+    learnState.curDay++;
+    fillCell(gridLearn, learnState.curDay, 0);
+    updateLearnProgress();
+    if (learnState.curDay < learnState.total) setTimeout(tick, 80);
+    else setTimeout(() => {
+      setNarration('✅', '30 天全部填完!',
+        '现在认真看你填好的日历:<b>30 号落在哪一列?蓝色那一列有几个数字?</b>下面回答两个问题。', 'milestone');
+      enterAnswer();
+    }, 200);
+  };
+  tick();
+}
+
+function enterAnswer() {
+  updatePhase('', 'answer');
+  document.getElementById('controls-fill').style.display = 'none';
+  document.getElementById('questions').style.display = 'block';
+  setTimeout(() => {
+    document.getElementById('q1').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 200);
+}
+
+function highlightMondays() {
+  const mondayDays = [1, 8, 15, 22, 29];
+  const cells = gridLearn.querySelectorAll('.cal-cell');
+  mondayDays.forEach((day, idx) => {
+    setTimeout(() => {
+      const cell = cells[day - 1];
+      if (cell) {
+        cell.classList.add('pulse');
+        setTimeout(() => cell.classList.remove('pulse'), 800);
+      }
+    }, idx * 240);
+  });
+}
+
+function enterDiscover() {
+  updatePhase('', 'discover');
+  highlightMondays();
+  setTimeout(() => {
+    document.getElementById('discovery').style.display = 'block';
+    document.getElementById('discovery').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 1500);
+}
+
+document.getElementById('btn-next').addEventListener('click', advanceLearn);
+document.getElementById('btn-fill-all').addEventListener('click', fillAllLearn);
+
+document.getElementById('q1-check').addEventListener('click', () => {
+  const val = parseInt(document.getElementById('q1-input').value);
+  const msg = document.getElementById('q1-msg');
+  if (val === 2) {
+    msg.textContent = '✓ 答对了!30 号在星期二那一格。';
+    msg.className = 'q-msg ok';
+    document.getElementById('q1-input').disabled = true;
+    document.getElementById('q1-check').style.display = 'none';
+    document.getElementById('q1').classList.add('solved');
+    document.getElementById('q2').style.display = 'block';
+    setTimeout(() => document.getElementById('q2').scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+  } else {
+    msg.textContent = '再看一眼日历,30 号在哪一列?';
+    msg.className = 'q-msg no';
+  }
+});
+
+document.getElementById('q2-check').addEventListener('click', () => {
+  const val = parseInt(document.getElementById('q2-input').value);
+  const msg = document.getElementById('q2-msg');
+  if (val === 5) {
+    msg.textContent = '✓ 太棒了!1、8、15、22、29——一共 5 个。';
+    msg.className = 'q-msg ok';
+    document.getElementById('q2-input').disabled = true;
+    document.getElementById('q2-check').style.display = 'none';
+    document.getElementById('q2').classList.add('solved');
+    enterDiscover();
+  } else {
+    msg.textContent = '再数数蓝色那一列,有几个数字?';
+    msg.className = 'q-msg no';
+  }
+});
+
+/* ====== Practice ====== */
+function makePractice() {
+  // 30 或 31 天的月份,排除 6 月(demo 用)
+  const monthData = [
+    {m:1, days:31},{m:3, days:31},{m:4, days:30},{m:5, days:31},
+    {m:7, days:31},{m:8, days:31},{m:9, days:30},{m:10, days:31},
+    {m:11, days:30},{m:12, days:31}
+  ];
+  const mObj = monthData[Math.floor(Math.random() * monthData.length)];
+  const startDay = Math.floor(Math.random() * 7) + 1;
+  const askDay = Math.floor(Math.random() * 7) + 1;
+  const endDay = ((startDay - 1 + mObj.days - 1) % 7) + 1;
+  let count = 0;
+  for (let d = 1; d <= mObj.days; d++) {
+    const dow = ((startDay - 1 + d - 1) % 7) + 1;
+    if (dow === askDay) count++;
+  }
+  return { month: mObj.m, days: mObj.days, startDay, askDay, endDay, count, curDay: 0 };
+}
+
+let pState = null;
+
+function renderPractice() {
+  pState = makePractice();
+  const p = pState;
+  document.getElementById('prob-text').innerHTML = `
+    某年 <span class="hl">${p.month} 月</span> 有 <span class="hl">${p.days}</span> 天。${p.month} 月 1 日是 <span class="hl">星期${dayNames[p.startDay-1]}</span>。
+    <br>请问 ${p.month} 月 ${p.days} 日是星期几?这 ${p.days} 天里有几个 <span class="hl">星期${dayNames[p.askDay-1]}</span>?
+  `;
+  document.getElementById('p-total-day').textContent = p.days;
+  document.getElementById('p-cur-day').textContent = 0;
+  document.getElementById('p-bar-fill').style.width = '0%';
+
+  buildHeader(document.getElementById('cal-header-practice'), p.askDay - 1);
+  buildGrid(document.getElementById('grid-practice'), p.startDay - 1, p.days, p.askDay - 1);
+
+  document.getElementById('p-controls-fill').style.display = 'flex';
+  document.getElementById('p-btn-next').disabled = false;
+  document.getElementById('p-btn-fill-all').disabled = false;
+
+  document.getElementById('p-questions').style.display = 'none';
+  document.getElementById('p-q2').style.display = 'none';
+  document.getElementById('p-win').style.display = 'none';
+
+  ['p-q1-input','p-q2-input'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+    el.disabled = false;
+  });
+  ['p-q1-check','p-q2-check'].forEach(id => document.getElementById(id).style.display = '');
+  ['p-q1-msg','p-q2-msg'].forEach(id => {
+    document.getElementById(id).textContent = '';
+    document.getElementById(id).className = 'q-msg';
+  });
+  document.getElementById('p-q1').classList.remove('solved');
+  document.getElementById('p-q2').classList.remove('solved');
+
+  document.getElementById('p-q1-text').innerHTML = `<b>${p.month} 月 ${p.days} 日</b> 是星期几?`;
+  document.getElementById('p-q2-text').innerHTML = `数一数高亮那一列(<b>星期${dayNames[p.askDay-1]}</b>),一共有几个?`;
+}
+
+function pAdvance() {
+  if (!pState || pState.curDay >= pState.days) return;
+  pState.curDay++;
+  fillCell(document.getElementById('grid-practice'), pState.curDay, pState.startDay - 1);
+  document.getElementById('p-cur-day').textContent = pState.curDay;
+  document.getElementById('p-bar-fill').style.width = (pState.curDay / pState.days * 100) + '%';
+  if (pState.curDay >= pState.days) pEnterAnswer();
+}
+
+function pFillAll() {
+  document.getElementById('p-btn-next').disabled = true;
+  document.getElementById('p-btn-fill-all').disabled = true;
+  const tick = () => {
+    if (pState.curDay >= pState.days) { pEnterAnswer(); return; }
+    pState.curDay++;
+    fillCell(document.getElementById('grid-practice'), pState.curDay, pState.startDay - 1);
+    document.getElementById('p-cur-day').textContent = pState.curDay;
+    document.getElementById('p-bar-fill').style.width = (pState.curDay / pState.days * 100) + '%';
+    if (pState.curDay < pState.days) setTimeout(tick, 65);
+    else setTimeout(pEnterAnswer, 200);
+  };
+  tick();
+}
+
+function pEnterAnswer() {
+  document.getElementById('p-controls-fill').style.display = 'none';
+  document.getElementById('p-questions').style.display = 'block';
+  setTimeout(() => document.getElementById('p-q1').scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+}
+
+document.getElementById('p-btn-next').addEventListener('click', pAdvance);
+document.getElementById('p-btn-fill-all').addEventListener('click', pFillAll);
+
+document.getElementById('p-q1-check').addEventListener('click', () => {
+  const val = parseInt(document.getElementById('p-q1-input').value);
+  const msg = document.getElementById('p-q1-msg');
+  if (val === pState.endDay) {
+    msg.textContent = '✓ 答对了!';
+    msg.className = 'q-msg ok';
+    document.getElementById('p-q1-input').disabled = true;
+    document.getElementById('p-q1-check').style.display = 'none';
+    document.getElementById('p-q1').classList.add('solved');
+    document.getElementById('p-q2').style.display = 'block';
+    setTimeout(() => document.getElementById('p-q2').scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+  } else {
+    msg.textContent = '再看一眼日历,最后一天落在哪一列?';
+    msg.className = 'q-msg no';
+  }
+});
+
+document.getElementById('p-q2-check').addEventListener('click', () => {
+  const val = parseInt(document.getElementById('p-q2-input').value);
+  const msg = document.getElementById('p-q2-msg');
+  if (val === pState.count) {
+    msg.textContent = '✓ 答对了!';
+    msg.className = 'q-msg ok';
+    document.getElementById('p-q2-input').disabled = true;
+    document.getElementById('p-q2-check').style.display = 'none';
+    document.getElementById('p-q2').classList.add('solved');
+    document.getElementById('p-win-text').innerHTML = `
+      ${pState.month} 月 ${pState.days} 日 = 星期${dayNames[pState.endDay-1]}<br>
+      共有 <strong>${pState.count}</strong> 个 星期${dayNames[pState.askDay-1]}
+    `;
+    document.getElementById('p-win').style.display = 'block';
+    setTimeout(() => document.getElementById('p-win').scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+  } else {
+    msg.textContent = `再数数高亮那一列(星期${dayNames[pState.askDay-1]})有几个数字?`;
+    msg.className = 'q-msg no';
+  }
+});
+
+document.getElementById('p-next-prob').addEventListener('click', renderPractice);
+
+// Init
+renderPractice();
+</script>
+</body>
+</html>

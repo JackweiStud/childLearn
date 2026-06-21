@@ -43,10 +43,14 @@
 
 **触发**:孩子做完作业,出现错题。
 
-1. **拍照** → 存到 `mistakeNote/` 临时位置(后面会挪)
-2. **跑 `rebuild-clean-exam` skill**:照片 → 干净版 PDF
-3. **读题文本**:从 PDF 复制题目原文(或人工录入)
-4. **让 Claude 生成 .html 互动教学**:
+1. **素材放 temp**:`mistakeNote/<年级>/<科目>/temp/`(已 .gitignore)是临时区。扔进任一组合:
+   - 仅原题图 → 让 Claude 按教学库 CPA 三层生成讲解 md + 互动 .html + 变形题(**模式 A**)
+   - 原题图 + .html(Claude 桌面版生成)→ 让 Claude 只整理归档(**模式 B**)
+   - 原题图 + 完整讲解 md + .html → 让 Claude 只归档(**模式 C**,日历题就是这种)
+   - **不论哪种模式,孩子的"真实错点"必须由家长口述给 Claude——不能让 Claude 编**(它看不到草稿,猜错就污染 mistakes 字段)
+2. **(可选)清理原题**:手机拍照有涂鸦/倾斜 → 跑 `rebuild-clean-exam` 出干净版 PDF。截图清晰就跳过。
+3. **读题文本**:从 PDF / 图片提取题目原文(模式 A 由 Claude 做,B/C 已经在素材里)
+4. **互动教学 .html**:
    - 文件名:`打开.html`(不要再生成 .jsx)
    - 必须**自包含且离线可用**:不得保留 `<script src="...">` 或运行时 Babel
    - 内联 React 18 UMD 运行时,把 JSX 以 classic runtime 预编译为普通 JS,末尾调用 `ReactDOM.createRoot(...).render(...)`
@@ -64,15 +68,19 @@
 
 ## 互动版规则(从 2026-06-19 起)
 
-- **优先 .html 自包含**:浏览器双击即开,零依赖、零编译
-- **运行时**:React 18 + ReactDOM 18 固定版本并内联;Babel 只允许在生成阶段使用,不得放进最终 HTML
-- **代码结构**:
+- **核心硬约束**:**自包含且离线可用**——浏览器双击即开,零依赖、零编译,断网也能跑。**React 是手段,离线是目的,本末别倒**。
+- **技术选型按需,vanilla JS 优先**:
+  - **简单交互**(按钮、显隐、计数、日历高亮、表单校验)→ **vanilla JS + DOM API**,文件小、零运行时。参考:`二年级/数学/错题/2026-06-21-日历找星期/打开.html`(~30K)。
+  - **复杂状态/动效**(多步骤动画、SVG 动态形变、组件复用)→ **React 18 + ReactDOM 18 UMD 内联**。参考:`二年级/数学/错题/2026-06-19-邮票一样多/打开.html`(~174K)。
+  - **绝不引入 vue/svelte/htmx/任何外部框架**——选项越少越好。
+- **如果用 React,代码结构**:
   - 源码顶部:`const { useState } = React;`(替代 import)
   - 主组件:`function XxxLesson() { ... }`(去掉 `export default`)
   - JSX 用 classic runtime 预编译,最终 HTML 里不应出现 `type="text/babel"`
   - 末尾:`ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(XxxLesson));`
 - **.jsx 可选保留**:如果想留 jsx 源码给 Claude 后续修改用,放同一文件夹叫 `互动版.jsx`,note.md 里链上。但**孩子入口永远是 .html**
 - **不做工程化**:不引 Vite、不写 package.json、不装 node_modules。一切退化到单文件 html
+- **回归测试**:`_system/tests/` 下的测试断言"无外部 src、无 `type=text/babel`、内联 JS 无语法错误"——三条对 vanilla 和 React 都适用。新题互动版**建议**(非强制)补对应的 loading 测试。
 
 ---
 
