@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>错题复习卷 · 2026-06-21</title>
+<style>
+  /* —— 屏幕预览 —— */
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+    color: #1a1a1a;
+    background: #f0f0f0;
+    margin: 0;
+    padding: 24px;
+  }
+  .page {
+    background: #fff;
+    max-width: 720px;
+    margin: 0 auto 32px;
+    padding: 36px 44px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    box-sizing: border-box;
+  }
+
+  /* —— 排版 —— */
+  h1.problem-title {
+    font-size: 24pt;
+    font-weight: 700;
+    margin: 0 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #333;
+  }
+  h2.section {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #2563eb;
+    margin: 22px 0 10px;
+  }
+  .question {
+    font-size: 17pt;
+    line-height: 1.85;
+    margin: 10px 0 14px;
+    padding: 12px 16px;
+    background: #f8f9fb;
+    border-left: 4px solid #2563eb;
+    border-radius: 4px;
+  }
+  .question .answer-line {
+    display: inline-block;
+    min-width: 80px;
+    border-bottom: 1.5px solid #888;
+    margin: 0 4px;
+    height: 1.2em;
+  }
+  .explain {
+    font-size: 14pt;
+    line-height: 1.85;
+  }
+  .explain p { margin: 8px 0; }
+  .explain .key {
+    background: #fff4cc;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .meta {
+    font-size: 12pt;
+    color: #666;
+    margin-bottom: 14px;
+  }
+  ol.solution {
+    font-size: 14pt;
+    line-height: 1.9;
+    padding-left: 26px;
+    margin: 6px 0;
+  }
+  ol.solution li { margin: 4px 0; }
+  .variation {
+    font-size: 16pt;
+    line-height: 2;
+    margin: 14px 0 18px;
+    padding: 14px 18px;
+    border: 1.5px dashed #888;
+    border-radius: 6px;
+  }
+  .variation .v-label {
+    display: inline-block;
+    background: #2563eb;
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 13pt;
+    margin-right: 8px;
+    vertical-align: 2px;
+  }
+  .variation .answer-line {
+    display: inline-block;
+    min-width: 60px;
+    border-bottom: 1.5px solid #888;
+    margin: 0 4px;
+    height: 1.2em;
+  }
+
+  /* —— 打印 —— */
+  @page {
+    size: A4;
+    margin: 1.6cm 1.5cm;
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page {
+      max-width: none;
+      margin: 0;
+      padding: 0;
+      box-shadow: none;
+      page-break-after: always;
+    }
+    .page:last-child { page-break-after: auto; }
+    .no-print { display: none; }
+  }
+
+  /* 屏幕态的打印提示条 */
+  .print-tip {
+    max-width: 720px;
+    margin: 0 auto 20px;
+    padding: 12px 20px;
+    background: #fff8e1;
+    border-left: 4px solid #fbbf24;
+    border-radius: 4px;
+    font-size: 13pt;
+  }
+  .print-tip kbd {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="print-tip no-print">
+  📄 打印步骤:<kbd>⌘</kbd> + <kbd>P</kbd> → 目标改为"另存为 PDF" → 保存。<strong>关掉"页眉和页脚"</strong>,边距选"默认"。共 3 页,一题一页。
+</div>
+
+<!-- ============ 第一题 ============ -->
+<div class="page">
+  <h1 class="problem-title">一、邮票一样多</h1>
+  <div class="meta">来源:学校试卷第 6 题 · 类型:和差问题(应用题)</div>
+
+  <h2 class="section">1.1 原题</h2>
+  <div class="question">
+    明明原来有 35 枚邮票,小本送给他 18 枚后,他俩的数量相同。<br>
+    小本原来有 <span class="answer-line"></span> 枚。
+  </div>
+
+  <h2 class="section">1.2 错点 · 考察点 · 解题思路</h2>
+  <div class="explain">
+    <p><strong>错点</strong>:把差距 18 当成<span class="key">单方向</span>,没想到"送出去"会让<span class="key">明明 +18、小本 −18 同时发生</span>,实际差距变化 = 2 × 18 = 36。</p>
+    <p><strong>考察点</strong>:和差问题里"一来一回,差距变 <span class="key">2 倍</span>"的核心抽象。</p>
+    <p><strong>解题思路(正向推,二年级首选)</strong>:</p>
+    <ol class="solution">
+      <li>送之前:明明 35,小本 ?</li>
+      <li>送出 18 → 明明 35 + 18 = <strong>53</strong></li>
+      <li>两人现在一样多 → 小本送完也是 53</li>
+      <li>小本原来 = 53 + 18 = <strong>71</strong></li>
+    </ol>
+  </div>
+
+  <h2 class="section">1.3 举一反三</h2>
+
+  <div class="variation">
+    <span class="v-label">变形 1</span>
+    玲玲有 24 颗糖,弟弟送给玲玲 9 颗后,两人糖一样多。<br>
+    弟弟原来有 <span class="answer-line"></span> 颗。
+  </div>
+
+  <div class="variation">
+    <span class="v-label">变形 2</span>
+    哥哥有 50 张画片,哥哥送给弟弟 12 张后,两人画片一样多。<br>
+    弟弟原来有 <span class="answer-line"></span> 张。
+  </div>
+
+  <div class="variation">
+    <span class="v-label">变形 3</span>
+    小华有 40 张邮票,小军比小华多 14 张。<br>
+    小军送给小华 <span class="answer-line"></span> 张后,两人邮票一样多。
+  </div>
+</div>
+
+<!-- ============ 第二题 ============ -->
+<div class="page">
+  <h1 class="problem-title">二、日历找星期</h1>
+  <div class="meta">来源:学校试卷第 8 题 · 类型:周期问题 / 除法应用</div>
+
+  <h2 class="section">2.1 原题</h2>
+  <div class="question">
+    某年的 6 月 1 日是星期一,6 月 30 日是星期 <span class="answer-line"></span>;<br>
+    6 月份这 30 天中有 <span class="answer-line"></span> 个星期一。
+  </div>
+
+  <h2 class="section">2.2 错点 · 考察点 · 解题思路</h2>
+  <div class="explain">
+    <p><strong>错点</strong>:两道小题都套 30÷7 = 4...2。第①题应当是 <span class="key">29 ÷ 7</span>(从 1 号走到 30 号<strong>经过</strong>的是 29 天,1 号本身不动);第②题才用 30(总天数)。两道小题除数来源不同,混在一起就错。</p>
+    <p><strong>考察点</strong>:<span class="key">整星期不算账,余数才算账</span>。"经过的天数"和"总天数"要分清楚。</p>
+    <p><strong>解题思路</strong>:</p>
+    <ol class="solution">
+      <li>第①题:30 − 1 = 29 天 → 29 ÷ 7 = 4 余 1 → 星期一 + 1 天 = <strong>星期二</strong></li>
+      <li>第②题:30 ÷ 7 = 4 余 2 → 4 个整星期一定有 4 个星期一;余下 2 天是第 29(星期一)、第 30(星期二),里面有 1 个星期一 → 4 + 1 = <strong>5 个</strong></li>
+    </ol>
+  </div>
+
+  <h2 class="section">2.3 举一反三</h2>
+
+  <div class="variation">
+    <span class="v-label">变形 1</span>
+    9 月 1 日是星期三,9 月份有 30 天。<br>
+    9 月 30 日是星期 <span class="answer-line"></span>;9 月份里有 <span class="answer-line"></span> 个星期三。
+  </div>
+
+  <div class="variation">
+    <span class="v-label">变形 2</span>
+    某月有 31 天,1 日是星期五。<br>
+    这个月 31 日是星期 <span class="answer-line"></span>;这 31 天里有 <span class="answer-line"></span> 个星期五。
+  </div>
+
+  <div class="variation">
+    <span class="v-label">变形 3</span>
+    12 月 1 日是星期日,12 月份有 31 天。<br>
+    12 月 31 日是星期 <span class="answer-line"></span>;这 31 天里有 <span class="answer-line"></span> 个<strong>星期一</strong>。
+  </div>
+</div>
+
+<!-- ============ 第三题 ============ -->
+<div class="page">
+  <h1 class="problem-title">三、电影放映时长</h1>
+  <div class="meta">来源:学校试卷第 7 题 · 类型:时间计算 / 退位减法</div>
+
+  <h2 class="section">3.1 原题</h2>
+  <div class="question">
+    小本和爸爸下午去看了一场电影。<br>
+    开始放映:下午 2 时 30 分;结束放映:下午 4 时 15 分。<br>
+    这场电影的放映时长是 <span class="answer-line"></span> 时 <span class="answer-line"></span> 分。
+  </div>
+
+  <h2 class="section">3.2 错点 · 考察点 · 解题思路</h2>
+  <div class="explain">
+    <p><strong>错点</strong>:<span class="key">审题错</span>——把"放映<strong>时长</strong>"误读成"几点结束",直接往结束时刻凑,填了 4 时 5 分。计算其实会,病根在没看清问什么。</p>
+    <p><strong>考察点</strong>:① 读懂"时长 = 经过了多久";② 跨整点时间相减,<span class="key">1 时 = 60 分</span>(借位关键)。</p>
+    <p><strong>解题思路一:时间轴跳格法(数形结合,首选)</strong>:</p>
+    <ol class="solution">
+      <li>2:30 → 3:00 走了 30 分</li>
+      <li>3:00 → 4:00 走了 1 时(60 分)</li>
+      <li>4:00 → 4:15 走了 15 分</li>
+      <li>合计:30 + 60 + 15 = 105 分 = <strong>1 时 45 分</strong></li>
+    </ol>
+    <p><strong>解题思路二:竖式退位</strong>:</p>
+    <ol class="solution">
+      <li>列出算式:4 时 15 分 − 2 时 30 分</li>
+      <li>分位 15 不够减 30 → 向时位借 1 时 = <span class="key">60 分</span></li>
+      <li>分位计算:15 + 60 = 75, 75 − 30 = 45 分</li>
+      <li>时位计算:4 − 1 − 2 = 1 时</li>
+      <li>合计:<strong>1 时 45 分</strong></li>
+    </ol>
+  </div>
+
+  <h2 class="section">3.3 举一反三</h2>
+
+  <div class="variation">
+    <span class="v-label">变形 1</span>
+    一节课从 上午 9 时 10 分 上到 上午 9 时 50 分。<br>
+    这节课上了 <span class="answer-line"></span> 时 <span class="answer-line"></span> 分。
+  </div>
+
+  <div class="variation">
+    <span class="v-label">变形 2</span>
+    小明做作业,从 晚上 7 时 20 分 做到 晚上 8 时 05 分。<br>
+    他做了 <span class="answer-line"></span> 时 <span class="answer-line"></span> 分。
+  </div>
+
+  <div class="variation">
+    <span class="v-label">变形 3</span>
+    一场篮球赛 下午 3 时 40 分 开始,打了 1 时 50 分。<br>
+    比赛 <span class="answer-line"></span> 时 <span class="answer-line"></span> 分 结束。
+  </div>
+</div>
+
+</body>
+</html>

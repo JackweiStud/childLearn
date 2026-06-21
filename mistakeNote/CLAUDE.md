@@ -151,7 +151,7 @@ has_interactive: true
 - 错题文件夹 slug:`YYYY-MM-DD-题目简称`
 - `[[wikilink]]` 的文本必须**精确等于**目标文件名(不带 `.md`),否则 Obsidian 链接会断
 - 同一道错题文件夹内文件名约定:
-  - **必有**:`note.md`、`原题.png`、`打开.html`
+  - **必有**:`note.md`、`原题.png`、`xxx.html`
   - **建议有**(已成事实标准):`variations.md`(3 道变形 + 家长答案)
   - **可选**:`干净版.pdf`(原题截图清晰就免)、`思路.png` / `思路2.png`(孩子草稿照片,家长区证据)、`互动版.jsx`(留给 Claude 改用的 jsx 源码)
 
