@@ -30,10 +30,10 @@
     border-bottom: 2px solid #333;
   }
   h2.section {
-    font-size: 16pt;
+    font-size: 14pt;
     font-weight: 700;
     color: #2563eb;
-    margin: 22px 0 10px;
+    margin: 16px 0 6px;
   }
   .question {
     font-size: 17pt;
@@ -52,10 +52,10 @@
     height: 1.2em;
   }
   .explain {
-    font-size: 14pt;
-    line-height: 1.85;
+    font-size: 12pt;
+    line-height: 1.55;
   }
-  .explain p { margin: 8px 0; }
+  .explain p { margin: 4px 0; }
   .explain .key {
     background: #fff4cc;
     padding: 2px 4px;
@@ -68,12 +68,12 @@
     margin-bottom: 14px;
   }
   ol.solution {
-    font-size: 14pt;
-    line-height: 1.9;
-    padding-left: 26px;
-    margin: 6px 0;
+    font-size: 12pt;
+    line-height: 1.6;
+    padding-left: 24px;
+    margin: 4px 0;
   }
-  ol.solution li { margin: 4px 0; }
+  ol.solution li { margin: 2px 0; }
   .variation {
     font-size: 16pt;
     line-height: 2;
@@ -106,7 +106,11 @@
     margin: 1.6cm 1.5cm;
   }
   @media print {
-    body { background: #fff; padding: 0; }
+    body {
+      background: #fff;
+      padding: 0;
+      font-family: "STHeiti", "Heiti SC", "Microsoft YaHei", Arial, sans-serif;
+    }
     .page {
       max-width: none;
       margin: 0;
@@ -115,6 +119,10 @@
       page-break-after: always;
     }
     .page:last-child { page-break-after: auto; }
+    .no-break {
+      page-break-after: auto !important;
+      break-after: auto !important;
+    }
     .no-print { display: none; }
   }
 
@@ -140,11 +148,11 @@
 <body>
 
 <div class="print-tip no-print">
-  📄 打印步骤:<kbd>⌘</kbd> + <kbd>P</kbd> → 目标改为"另存为 PDF" → 保存。<strong>关掉"页眉和页脚"</strong>,边距选"默认"。共 3 页,一题一页。
+  📄 打印步骤:<kbd>⌘</kbd> + <kbd>P</kbd> → 目标改为"另存为 PDF" → 保存。<strong>关掉"页眉和页脚"</strong>,边距选"默认"。共 2 页,第一、二题一页,第三题一页。
 </div>
 
 <!-- ============ 第一题 ============ -->
-<div class="page">
+<div class="page no-break">
   <h1 class="problem-title">一、邮票一样多</h1>
   <div class="meta">来源:学校试卷第 6 题 · 类型:和差问题(应用题)</div>
 
