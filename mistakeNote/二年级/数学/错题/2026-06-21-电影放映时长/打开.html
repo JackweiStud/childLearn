@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电影放映时长 · 时间轴</title>
+<style>
+:root{
+  --paper:#F5F7FB; --surface:#FFFFFF; --ink:#15233B; --muted:#62718B; --line:#DBE4F0;
+  --blue:#2F7DF6; --blue-deep:#1D4ED8; --blue-bg:#DCEAFE;
+  --green:#16A34A; --green-deep:#15803D; --green-bg:#DCFCE7;
+  --pink:#EC4899; --pink-deep:#BE185D; --pink-bg:#FBDCEC;
+  --amber:#F59E0B; --amber-deep:#B45309; --amber-bg:#FEF3D6;
+  --warn:#DC2626;
+}
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{
+  font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,sans-serif;
+  background:
+    radial-gradient(circle at 0% 0%, #DCEAFE 0, rgba(220,234,254,0) 35%),
+    radial-gradient(circle at 100% 8%, #FBDCEC 0, rgba(251,220,236,0) 38%),
+    var(--paper);
+  color:var(--ink); min-height:100vh; padding:14px; font-size:17px;
+  -webkit-font-smoothing:antialiased;
+}
+.app{ max-width:780px; margin:0 auto; }
+.header{ display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+.logo{ width:54px; height:54px; border-radius:16px; display:grid; place-items:center;
+  background:#fff; border:2px solid var(--line); font-size:30px; flex:none;
+  box-shadow:0 6px 16px rgba(47,125,246,.12); }
+.header h1{ font-size:23px; font-weight:800; }
+.header p{ font-size:13.5px; color:var(--muted); margin-top:3px; line-height:1.5; }
+
+.tabs{ display:flex; gap:8px; margin-bottom:16px; }
+.tab{ flex:1; padding:13px; border-radius:14px; border:2px solid var(--line);
+  background:#fff; font-size:16px; font-weight:700; color:var(--muted);
+  cursor:pointer; font-family:inherit; transition:.15s; }
+.tab.on{ background:var(--ink); color:#fff; border-color:var(--ink);
+  box-shadow:0 6px 16px rgba(21,35,59,.22); }
+
+.card{ background:#fff; border:2px solid var(--line); border-radius:18px; padding:16px; margin-bottom:14px; }
+
+/* 双钟面 */
+.clocks{ display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; }
+.clock-box{ text-align:center; }
+.clock-label{ font-size:14px; font-weight:800; color:var(--muted); margin-top:4px; }
+.clock-time{ font-size:18px; font-weight:800; }
+.arrow{ font-size:30px; color:var(--blue); }
+
+/* 步骤条 */
+.chips{ display:flex; gap:5px; margin-bottom:14px; flex-wrap:wrap; }
+.chip{ flex:1 1 0; min-width:56px; padding:8px 4px; border-radius:12px;
+  border:2px solid var(--line); background:#fff; font-size:12px; font-weight:700;
+  color:var(--muted); cursor:pointer; display:flex; flex-direction:column;
+  align-items:center; gap:3px; font-family:inherit; transition:.15s; }
+.chip-num{ width:20px; height:20px; border-radius:50%; background:#EEF2F8;
+  color:var(--muted); display:grid; place-items:center; font-size:11.5px; }
+.chip.active{ border-color:var(--blue); color:var(--blue-deep); background:var(--blue-bg); }
+.chip.active .chip-num{ background:var(--blue); color:#fff; }
+.chip.done{ border-color:#C8E6CF; color:var(--green); }
+.chip.done .chip-num{ background:var(--green); color:#fff; }
+
+.timeline-wrap{ overflow-x:auto; padding:4px 0; }
+.narration{ background:linear-gradient(0deg,var(--blue-bg),#fff 75%);
+  border:2px solid var(--blue); border-radius:16px; padding:14px; margin-top:14px;
+  display:flex; gap:12px; align-items:flex-start; }
+.narration.key{ background:linear-gradient(0deg,var(--pink-bg),#fff 70%); border-color:var(--pink); }
+.nar-icon{ font-size:26px; flex:none; }
+.nar-title{ font-size:17px; font-weight:800; margin-bottom:4px; }
+.nar-text{ font-size:15.5px; line-height:1.65; color:#2A3A55; }
+.keytag{ font-size:11px; background:var(--pink); color:#fff; padding:2px 8px;
+  border-radius:999px; margin-left:8px; font-weight:800; }
+
+/* 审题选择 */
+.qpick{ display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+.qpick button{ padding:14px; border-radius:14px; border:2px solid var(--line);
+  background:#fff; font-size:16px; font-weight:700; color:var(--ink);
+  cursor:pointer; font-family:inherit; text-align:left; transition:.15s; }
+.qpick button:hover{ border-color:var(--blue); }
+.qpick button.wrong{ border-color:var(--warn); background:#FEF2F2; color:var(--warn); }
+.qpick button.right{ border-color:var(--green); background:var(--green-bg); color:var(--green-deep); }
+.qpick-msg{ margin-top:10px; font-size:14.5px; font-weight:700; line-height:1.5; }
+
+.controls{ display:flex; gap:10px; margin-top:14px; }
+.btn{ font-family:inherit; font-weight:800; border-radius:14px; cursor:pointer;
+  border:2px solid transparent; padding:14px 18px; font-size:16px; transition:.15s; }
+.btn.primary{ flex:1; background:var(--blue); color:#fff; box-shadow:0 6px 16px rgba(47,125,246,.3); }
+.btn.primary:active{ transform:translateY(1px); }
+.btn.primary:disabled{ opacity:.4; cursor:default; box-shadow:none; }
+.btn.ghost{ background:#fff; color:var(--muted); border-color:var(--line); }
+.btn.ghost:disabled{ opacity:.4; cursor:default; }
+
+/* 竖式 */
+.vsum{ font-family:"Courier New",monospace; font-size:22px; font-weight:800;
+  background:var(--amber-bg); border:2px dashed var(--amber); border-radius:14px;
+  padding:14px 18px; margin-top:12px; line-height:1.7; color:var(--amber-deep); white-space:pre; }
+
+.parent-tip{ margin-top:16px; font-size:12.5px; color:var(--muted); line-height:1.6;
+  background:#fff; border:2px dashed var(--line); border-radius:14px; padding:11px 13px; }
+
+/* 练习 */
+.prob{ font-size:18px; font-weight:700; line-height:1.7; }
+.prob b{ color:var(--blue-deep); }
+.ans-row{ display:flex; align-items:center; gap:8px; margin-top:14px; flex-wrap:wrap; }
+.ans-input{ width:72px; padding:12px; font-size:22px; font-weight:800; text-align:center;
+  border:2px solid var(--line); border-radius:12px; font-family:inherit; color:var(--ink); }
+.ans-input:focus{ outline:none; border-color:var(--blue); }
+.ans-input:disabled{ background:var(--green-bg); border-color:#C8E6CF; color:var(--green); }
+.ans-unit{ font-size:17px; font-weight:700; color:var(--muted); }
+.q-msg{ margin-top:12px; font-size:14.5px; font-weight:700; min-height:20px; }
+.q-msg.no{ color:var(--warn); }
+.q-msg.ok{ color:var(--green); }
+.hint-link{ display:block; margin-top:10px; background:none; border:none; padding:0;
+  color:var(--blue-deep); font-weight:700; font-size:13.5px; cursor:pointer;
+  font-family:inherit; text-align:left; }
+.win{ margin-top:14px; background:linear-gradient(135deg,#FEF3D6,#FBDCEC);
+  border:2px solid var(--pink); border-radius:18px; padding:18px; text-align:center;
+  font-size:17px; font-weight:700; line-height:1.7; }
+.win b{ font-size:24px; color:var(--pink-deep); }
+.stars{ margin-top:8px; font-size:14px; font-weight:800; color:var(--amber-deep); }
+.hidden{ display:none; }
+@media (prefers-reduced-motion: reduce){ .seg{ transition:none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="logo">🎬</div>
+    <div>
+      <h1>电影放映时长 · 时间轴</h1>
+      <p>下午 2:30 开始,4:15 结束。这场电影放了多久?用时间轴一格一格数出来。</p>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab on" id="tab-learn">📐 跟我学</button>
+    <button class="tab" id="tab-practice">✏️ 练一练</button>
+  </div>
+
+  <!-- ====== 跟我学 ====== -->
+  <div id="view-learn">
+    <div class="card">
+      <div class="clocks">
+        <div class="clock-box">
+          <svg width="92" height="92" viewBox="0 0 100 100" id="clock-start"></svg>
+          <div class="clock-time">下午 2:30</div>
+          <div class="clock-label">开始</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="clock-box">
+          <svg width="92" height="92" viewBox="0 0 100 100" id="clock-end"></svg>
+          <div class="clock-time">下午 4:15</div>
+          <div class="clock-label">结束</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chips" id="chips"></div>
+
+    <div class="card">
+      <div class="timeline-wrap">
+        <svg viewBox="0 0 480 150" id="timeline" style="width:100%;height:auto;display:block;"></svg>
+      </div>
+      <div id="vsum-box"></div>
+    </div>
+
+    <div id="narration-box"></div>
+
+    <div class="controls">
+      <button class="btn ghost" id="prev" disabled>← 上一步</button>
+      <button class="btn primary" id="next">下一步 →</button>
+    </div>
+
+    <div class="parent-tip">
+      家长小提示:第 1 步"读题"是孩子真正栽过的地方。别急着教算法,先确认他答得出"时长 = 放了多久,不是几点结束"。每跳一格问他"这一段走了多少分钟?"——能自己说出来,才是真懂。
+    </div>
+  </div>
+
+  <!-- ====== 练一练 ====== -->
+  <div id="view-practice" class="hidden">
+    <div class="card">
+      <div class="prob" id="prob-text"></div>
+      <div class="timeline-wrap hidden" id="p-timeline-wrap">
+        <svg viewBox="0 0 480 140" id="p-timeline" style="width:100%;height:auto;display:block;margin-top:10px;"></svg>
+      </div>
+      <div class="ans-row">
+        放了
+        <input class="ans-input" id="ans-h" inputmode="numeric" placeholder="?">
+        <span class="ans-unit">时</span>
+        <input class="ans-input" id="ans-m" inputmode="numeric" placeholder="?">
+        <span class="ans-unit">分</span>
+        <button class="btn primary" id="check" style="flex:none;padding:12px 20px;">检查</button>
+      </div>
+      <div class="q-msg" id="p-msg"></div>
+      <button class="hint-link" id="hint-btn">看一眼提示?</button>
+      <div id="p-win"></div>
+    </div>
+    <div class="parent-tip">
+      家长小提示:让孩子先念一遍题,圈出"放了多久 / 用了多长时间"。先到整点、再数零头,或者用退位竖式都行——问他用的哪种方法。
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 画钟面 =====
+function drawClock(svgId, h, m){
+  const svg = document.getElementById(svgId);
+  const cx=50, cy=50, r=44;
+  let parts = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" stroke="#1D4ED8" stroke-width="3"/>`;
+  // 12 个刻度
+  for(let i=0;i<12;i++){
+    const a = i*30 * Math.PI/180;
+    const x1 = cx + (r-5)*Math.sin(a), y1 = cy - (r-5)*Math.cos(a);
+    const x2 = cx + (r-1)*Math.sin(a), y2 = cy - (r-1)*Math.cos(a);
+    parts += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#94A3B8" stroke-width="${i%3===0?2.5:1}"/>`;
+  }
+  // 时针(含分钟带来的偏移)
+  const ha = ((h%12) + m/60) * 30 * Math.PI/180;
+  const hx = cx + (r*0.5)*Math.sin(ha), hy = cy - (r*0.5)*Math.cos(ha);
+  parts += `<line x1="${cx}" y1="${cy}" x2="${hx.toFixed(1)}" y2="${hy.toFixed(1)}" stroke="#15233B" stroke-width="4" stroke-linecap="round"/>`;
+  // 分针
+  const ma = m*6 * Math.PI/180;
+  const mx = cx + (r*0.78)*Math.sin(ma), my = cy - (r*0.78)*Math.cos(ma);
+  parts += `<line x1="${cx}" y1="${cy}" x2="${mx.toFixed(1)}" y2="${my.toFixed(1)}" stroke="#EC4899" stroke-width="3" stroke-linecap="round"/>`;
+  parts += `<circle cx="${cx}" cy="${cy}" r="3.5" fill="#15233B"/>`;
+  svg.innerHTML = parts;
+}
+drawClock('clock-start', 2, 30);
+drawClock('clock-end', 4, 15);
+
+// ===== 跟我学:时间轴跳格 =====
+// 段:① 2:30→3:00 (30分,绿)  ② 3:00→4:00 (60分,蓝)  ③ 4:00→4:15 (15分,粉)
+const STEPS = [
+  { chip:"读题", icon:"🔍", title:"先看清楚:问的是什么?", key:true,
+    text:"题目问的是『放映<b>时长</b>』——是问电影<b>放了多久</b>,不是问几点结束!这一步看错,后面全错。先选对再往下。",
+    pick:true },
+  { chip:"画轴", icon:"📏", title:"把开始和结束画到时间轴上",
+    text:"左边是开始 2:30,右边是结束 4:15。我们要数:从 2:30 走到 4:15,一共走了多久?分段跳到整点最好数。", lit:0 },
+  { chip:"第①段", icon:"🟢", title:"2:30 → 3:00,先跳到整点",
+    text:"从 2:30 走到 3:00,走了 <b>30 分</b>。先把零头解决掉,后面就好数了。", lit:1 },
+  { chip:"第②段", icon:"🔵", title:"3:00 → 4:00,整整一小时",
+    text:"从 3:00 到 4:00,正好 <b>1 时 = 60 分</b>。整点之间最好数,一眼就是 1 小时。", lit:2 },
+  { chip:"第③段", icon:"🩷", title:"4:00 → 4:15,最后一点零头",
+    text:"从 4:00 到 4:15,走了 <b>15 分</b>。三段都画好了,加起来就是答案。", lit:3 },
+  { chip:"合计", icon:"✅", title:"三段加起来 = 1 时 45 分",
+    text:"30 分 + 60 分 + 15 分 = <b>105 分 = 1 时 45 分</b>。电影放了 1 小时 45 分钟!", lit:3, vsum:true },
+];
+
+let step = 0;
+const segDefs = [
+  { x0:30,  x1:150, color:"#16A34A", label:"30分" },   // ① 2:30-3:00
+  { x0:150, x1:390, color:"#2F7DF6", label:"60分" },   // ② 3:00-4:00
+  { x0:390, x1:450, color:"#EC4899", label:"15分" },   // ③ 4:00-4:15
+];
+const ticks = [
+  { x:30,  t:"2:30" }, { x:150, t:"3:00" }, { x:390, t:"4:00" }, { x:450, t:"4:15" },
+];
+
+function drawTimeline(litCount){
+  const y=70, h=26;
+  let p = `<line x1="20" y1="${y+h+18}" x2="460" y2="${y+h+18}" stroke="#94A3B8" stroke-width="2"/>`;
+  // 刻度线 + 标签
+  ticks.forEach(tk=>{
+    p += `<line x1="${tk.x}" y1="${y-8}" x2="${tk.x}" y2="${y+h+24}" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="2,3"/>`;
+    p += `<text x="${tk.x}" y="${y+h+40}" font-size="14" font-weight="800" fill="#62718B" text-anchor="middle">${tk.t}</text>`;
+  });
+  // 三段(按 litCount 点亮)
+  segDefs.forEach((s,i)=>{
+    const lit = i < litCount;
+    p += `<rect class="seg" x="${s.x0}" y="${y}" width="${s.x1-s.x0}" height="${h}" rx="6"
+      fill="${lit? s.color : '#EEF2F8'}" stroke="${lit? s.color : '#DBE4F0'}" stroke-width="2"
+      style="transition:fill .4s ease;"/>`;
+    if(lit){
+      p += `<text x="${(s.x0+s.x1)/2}" y="${y+h/2+5}" font-size="14" font-weight="800" fill="#fff" text-anchor="middle">${s.label}</text>`;
+    }
+  });
+  // 起止旗标
+  p += `<text x="30" y="${y-16}" font-size="18" text-anchor="middle">🎬</text>`;
+  p += `<text x="450" y="${y-16}" font-size="18" text-anchor="middle">🏁</text>`;
+  document.getElementById('timeline').innerHTML = p;
+}
+
+function renderChips(){
+  let html='';
+  STEPS.forEach((s,i)=>{
+    const cls = 'chip' + (i===step?' active':'') + (i<step?' done':'');
+    html += `<button class="${cls}" data-i="${i}"><span class="chip-num">${i+1}</span>${s.chip}</button>`;
+  });
+  const c = document.getElementById('chips');
+  c.innerHTML = html;
+  c.querySelectorAll('.chip').forEach(b=>{
+    b.addEventListener('click',()=>{ step = +b.dataset.i; renderLearn(); });
+  });
+}
+
+let pickSolved = false;
+function renderLearn(){
+  const s = STEPS[step];
+  renderChips();
+  drawTimeline(s.lit !== undefined ? s.lit : 0);
+
+  // 竖式(只在合计步出现)
+  document.getElementById('vsum-box').innerHTML = s.vsum
+    ? `<div class="vsum">    4 时 15 分\n  − 2 时 30 分\n  ─────────\n  15 不够减30,借1时=<b>60</b>分\n  75 − 30 = 45 分\n  4 − 1 − 2 = 1 时\n  = <b>1 时 45 分</b></div>`
+    : '';
+
+  // 讲解卡 + (第一步)审题选择
+  let narr = `<div class="narration${s.key?' key':''}">
+    <span class="nar-icon">${s.icon}</span>
+    <div>
+      <div class="nar-title">${s.title}${s.key?'<span class="keytag">最关键</span>':''}</div>
+      <div class="nar-text">${s.text}</div>`;
+  if(s.pick){
+    narr += `<div class="qpick" id="qpick">
+        <button data-ok="0">问的是:电影几点结束(4:15)</button>
+        <button data-ok="1">问的是:电影一共放了多久</button>
+      </div>
+      <div class="qpick-msg" id="qpick-msg"></div>`;
+  }
+  narr += `</div></div>`;
+  document.getElementById('narration-box').innerHTML = narr;
+
+  if(s.pick){
+    const msg = document.getElementById('qpick-msg');
+    document.querySelectorAll('#qpick button').forEach(b=>{
+      b.addEventListener('click',()=>{
+        if(b.dataset.ok==='1'){
+          b.classList.add('right'); pickSolved=true;
+          msg.textContent='✅ 对!问的是"放了多久"。这就是要算的"时长"。点"下一步"继续。';
+          msg.style.color='#15803D';
+        }else{
+          b.classList.add('wrong');
+          msg.textContent='❌ 再读一遍——"时长"是问放了"多久",4:15 只是结束的时刻,不是答案。';
+          msg.style.color='#DC2626';
+        }
+        updateNav();
+      });
+    });
+  }
+  updateNav();
+}
+
+function updateNav(){
+  const s = STEPS[step];
+  document.getElementById('prev').disabled = (step===0);
+  const next = document.getElementById('next');
+  // 第一步必须选对审题才能继续
+  if(s.pick && !pickSolved){
+    next.disabled = true;
+    next.textContent = '先选对上面 →';
+  }else if(step === STEPS.length-1){
+    next.disabled = false;
+    next.textContent = '↺ 再看一遍';
+  }else{
+    next.disabled = false;
+    next.textContent = '下一步 →';
+  }
+}
+
+document.getElementById('next').addEventListener('click',()=>{
+  if(step === STEPS.length-1){ step=0; pickSolved=false; }
+  else step++;
+  renderLearn();
+});
+document.getElementById('prev').addEventListener('click',()=>{
+  if(step>0) step--; renderLearn();
+});
+
+// ===== 练一练 =====
+const OPTS = [0,5,10,15,20,30,40,45,50];
+let prob = null;
+function newProblem(){
+  const h1 = 1 + Math.floor(Math.random()*3);          // 下午 1-3 时开始
+  const m1 = OPTS[Math.floor(Math.random()*OPTS.length)];
+  const addH = 1 + Math.floor(Math.random()*2);         // 跨 1-2 小时
+  const m2 = OPTS[Math.floor(Math.random()*OPTS.length)];
+  const h2 = h1 + addH;
+  const total = (h2*60+m2) - (h1*60+m1);
+  prob = { h1,m1,h2,m2, dh:Math.floor(total/60), dm:total%60 };
+}
+function fmt(h,m){ return `下午 ${h}:${String(m).padStart(2,'0')}`; }
+function fmtS(h,m){ return `${h}:${String(m).padStart(2,'0')}`; }
+function fmtMins(m){ if(m<60) return m+'分'; const h=Math.floor(m/60), r=m%60; return r? h+'时'+r+'分' : h+'时'; }
+// 把一道时长题拆成"头零头 / 整时块 / 尾零头"三段(跟教学步骤同款跳格法)
+function buildSegs(h1,m1,h2,m2){
+  const colors=['#16A34A','#2F7DF6','#EC4899'];
+  const segs=[]; let curH=h1;
+  if(m1>0){ segs.push({mins:60-m1, from:fmtS(h1,m1), to:fmtS(h1+1,0)}); curH=h1+1; }
+  const wholeH = h2 - curH;
+  if(wholeH>0){ segs.push({mins:wholeH*60, from:fmtS(curH,0), to:fmtS(h2,0)}); }
+  if(m2>0){ segs.push({mins:m2, from:fmtS(h2,0), to:fmtS(h2,m2)}); }
+  segs.forEach((s,i)=>s.color=colors[i%colors.length]);
+  return segs;
+}
+// showMins=false 时只画分段结构+时刻刻度(脚手架),true 时才标出每段分钟数(验证用)
+function drawPracticeTimeline(showMins){
+  const segs = buildSegs(prob.h1,prob.m1,prob.h2,prob.m2);
+  const total = prob.dh*60 + prob.dm;
+  const W=480, padL=34, padR=34, avail=W-padL-padR, y=58, h=26;
+
+  // 1. 算每个刻度的 x 和 label(段间断点 + 最左端)
+  let x=padL;
+  const ticks = [{ x:padL, label:(segs.length ? segs[0].from : fmtS(prob.h1,prob.m1)) }];
+  segs.forEach(s=>{ x += s.mins/total*avail; ticks.push({ x:x, label:s.to }); });
+
+  // 2. 错行避让:相邻刻度太近(<44px)就把后一个标签下移一行,且只跟"上一行 row=0"比较,避免连环下移
+  const MIN_GAP = 44;
+  ticks.forEach((t,i)=>{
+    if(i===0){ t.row = 0; return; }
+    const prev = ticks[i-1];
+    t.row = (prev.row === 0 && (t.x - prev.x) < MIN_GAP) ? 1 : 0;
+  });
+
+  // 3. 画底轴
+  let p = `<line x1="${padL-14}" y1="${y+h+18}" x2="${W-padR+14}" y2="${y+h+18}" stroke="#94A3B8" stroke-width="2"/>`;
+
+  // 4. 画段块
+  x = padL;
+  segs.forEach(s=>{
+    const w = s.mins/total*avail;
+    p += `<rect x="${x.toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="${h}" rx="6" fill="${s.color}" stroke="${s.color}" stroke-width="2"/>`;
+    if(showMins && w >= 30){
+      // 段太窄时不在段内标分钟,改成放标签上方避免挤
+      p += `<text x="${(x+w/2).toFixed(1)}" y="${y+h/2+5}" font-size="13" font-weight="800" fill="#fff" text-anchor="middle">${fmtMins(s.mins)}</text>`;
+    } else if(showMins){
+      p += `<text x="${(x+w/2).toFixed(1)}" y="${y-2}" font-size="12" font-weight="800" fill="${s.color}" text-anchor="middle">${fmtMins(s.mins)}</text>`;
+    }
+    x += w;
+  });
+
+  // 5. 画刻度虚线 + 错行标签
+  ticks.forEach(t=>{
+    p += `<line x1="${t.x.toFixed(1)}" y1="${y-6}" x2="${t.x.toFixed(1)}" y2="${y+h+22}" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="2,3"/>`;
+    const yLabel = t.row === 0 ? (y+h+38) : (y+h+54);
+    // row=1 时画一条短引线提示这个标签属于哪个 tick
+    if(t.row === 1){
+      p += `<line x1="${t.x.toFixed(1)}" y1="${y+h+24}" x2="${t.x.toFixed(1)}" y2="${y+h+44}" stroke="#94A3B8" stroke-width="1.2" stroke-dasharray="1,2"/>`;
+    }
+    p += `<text x="${t.x.toFixed(1)}" y="${yLabel}" font-size="13" font-weight="800" fill="#62718B" text-anchor="middle">${t.label}</text>`;
+  });
+
+  // 6. 旗
+  p += `<text x="${padL}" y="${y-14}" font-size="16" text-anchor="middle">🎬</text>`;
+  p += `<text x="${x.toFixed(1)}" y="${y-14}" font-size="16" text-anchor="middle">🏁</text>`;
+  document.getElementById('p-timeline').innerHTML = p;
+}
+function renderPractice(){
+  newProblem();
+  document.getElementById('prob-text').innerHTML =
+    `电影 <b>${fmt(prob.h1,prob.m1)}</b> 开始,<b>${fmt(prob.h2,prob.m2)}</b> 结束。<br>这场电影放了多久?`;
+  const ih=document.getElementById('ans-h'), im=document.getElementById('ans-m');
+  ih.value=''; im.value=''; ih.disabled=false; im.disabled=false;
+  document.getElementById('p-msg').textContent=''; document.getElementById('p-msg').className='q-msg';
+  document.getElementById('p-win').innerHTML='';
+  document.getElementById('check').disabled=false;
+  document.getElementById('hint-btn').classList.remove('hidden');
+  document.getElementById('p-timeline-wrap').classList.add('hidden');
+  drawPracticeTimeline(false);
+  ih.focus();
+}
+function checkAnswer(){
+  const h = parseInt(document.getElementById('ans-h').value,10);
+  const m = parseInt(document.getElementById('ans-m').value,10);
+  const msg = document.getElementById('p-msg');
+  if(Number.isNaN(h)||Number.isNaN(m)){ msg.textContent='两个空都要填哦~'; msg.className='q-msg no'; return; }
+  if(h===prob.dh && m===prob.dm){
+    msg.textContent='🎉 完全正确!'; msg.className='q-msg ok';
+    document.getElementById('ans-h').disabled=true;
+    document.getElementById('ans-m').disabled=true;
+    document.getElementById('check').disabled=true;
+    document.getElementById('hint-btn').classList.add('hidden');
+    solvedCount++;
+    document.getElementById('p-timeline-wrap').classList.remove('hidden');
+    drawPracticeTimeline(true);
+    document.getElementById('p-win').innerHTML =
+      `<div class="win">放了 <b>${prob.dh}</b> 时 <b>${prob.dm}</b> 分 ✓
+        <div class="stars">已答对 ${solvedCount} 题 ${'⭐'.repeat(Math.min(solvedCount,5))}</div>
+        <button class="btn primary" id="next-prob" style="width:100%;margin-top:12px;">再来一题 →</button>
+      </div>`;
+    document.getElementById('next-prob').addEventListener('click', renderPractice);
+  }else{
+    msg.textContent='再想想~ 先跳到整点(比如先算到下一个整时),再数零头。'; msg.className='q-msg no';
+  }
+}
+let solvedCount = 0;
+document.getElementById('check').addEventListener('click', checkAnswer);
+['ans-h','ans-m'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',e=>{ e.target.value = e.target.value.replace(/[^0-9]/g,''); });
+  document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') checkAnswer(); });
+});
+document.getElementById('hint-btn').addEventListener('click',()=>{
+  const msg=document.getElementById('p-msg');
+  msg.innerHTML = `提示:看下面的时间轴,每段走了多少分钟已经标出来了,把它们加起来就是答案。`;
+  msg.className='q-msg';
+  document.getElementById('p-timeline-wrap').classList.remove('hidden');
+  drawPracticeTimeline(true);
+});
+
+// ===== Tab 切换 =====
+document.getElementById('tab-learn').addEventListener('click',()=>{
+  document.getElementById('tab-learn').classList.add('on');
+  document.getElementById('tab-practice').classList.remove('on');
+  document.getElementById('view-learn').classList.remove('hidden');
+  document.getElementById('view-practice').classList.add('hidden');
+});
+document.getElementById('tab-practice').addEventListener('click',()=>{
+  document.getElementById('tab-practice').classList.add('on');
+  document.getElementById('tab-learn').classList.remove('on');
+  document.getElementById('view-practice').classList.remove('hidden');
+  document.getElementById('view-learn').classList.add('hidden');
+});
+
+// ===== 启动 =====
+renderLearn();
+renderPractice();
+</script>
+</body>
+</html>
