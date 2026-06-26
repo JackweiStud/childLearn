@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>错题拍照台</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">mistakeNote</p>
+          <h1>错题拍照台</h1>
+          <p class="subtitle">默认不打开摄像头。放好试卷后，点击“开启摄像头”。</p>
+        </div>
+        <div class="top-actions">
+          <label class="device-picker">
+            摄像头
+            <select id="deviceSelect"></select>
+          </label>
+          <label class="device-picker compact">
+            分辨率
+            <select id="resolutionMode">
+              <option value="max" selected>最高分辨率 / 4K 优先</option>
+              <option value="1080p">1080p</option>
+              <option value="720p">720p</option>
+            </select>
+          </label>
+          <button id="startCameraButton" type="button">开启摄像头</button>
+          <button id="stopCameraButton" type="button" disabled>关闭摄像头</button>
+          <button id="refreshDevicesButton" type="button">刷新设备</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div class="preview-card">
+          <div class="preview-wrap">
+            <video id="preview" autoplay playsinline muted></video>
+            <canvas id="annotationCanvas" aria-label="画面标注层"></canvas>
+            <div id="standbyOverlay" class="standby-overlay">
+              <strong>摄像头未开启</strong>
+              <span>点击“开启摄像头”后再拍题。</span>
+            </div>
+            <div class="a4-guide">
+              <span>把试卷四角放进这个框</span>
+            </div>
+          </div>
+          <div class="status-row">
+            <div class="status-copy">
+              <p id="qualityHint">摄像头未开启。点击“开启摄像头”后，浏览器会请求权限。</p>
+              <p id="actualResolution">实际分辨率: 未开启</p>
+            </div>
+            <div class="actions">
+              <button id="captureButton" type="button" disabled>拍照</button>
+              <button id="openFolderButton" type="button">打开保存目录</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="recent-card">
+          <h2>最近拍摄</h2>
+          <ol id="recentList" class="recent-list"></ol>
+          <section id="cameraControls" class="camera-controls">
+            <h2>摄像头调节</h2>
+            <p id="controlsHint">开启摄像头后显示当前设备支持的控制项。</p>
+            <div id="controlsList" class="controls-list"></div>
+            <h3>红色标注工具</h3>
+            <div id="annotationToolbar" class="annotation-toolbar" aria-label="红色标注工具栏">
+              <button type="button" data-tool="rect" class="active">矩形</button>
+              <button type="button" data-tool="circle">圆形</button>
+              <button type="button" data-tool="pen">画笔</button>
+              <button id="clearAnnotationsButton" type="button">清空</button>
+            </div>
+            <h3>软件兜底调节</h3>
+            <p class="controls-note">不依赖硬件能力；会同时影响预览和保存的照片。</p>
+            <div id="softwareControlsList" class="controls-list"></div>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <canvas id="scratchCanvas" hidden></canvas>
+    <script src="/capture-effects.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

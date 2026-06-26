@@ -16,6 +16,13 @@ rebuild-clean-exam/outPdfFile/
 # 任何路径下的 temp/ 都不入库,文件就是中间态,不该有 git 历史
 mistakeNote/**/temp/
 
+# 错题拍照台原始扫描入口:待确认/待裁剪素材,归档后的单题图片再入库
+mistakeNote/_inbox/scans/
+mistakeNote/_inbox/crops/
+
+# Playwright MCP 本地验证产物
+mistakeNote/.playwright-mcp/
+
 # Claude Code 本地 permissions(个人设备配置,不跨设备共享)
 # slash command(.claude/commands/)入库;settings.local 不入库
 **/.claude/settings.local.json
