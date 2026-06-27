@@ -2,8 +2,10 @@
 (function exposeAnnotationHandler(root) {
   // 标注状态管理
   const state = {
-    currentTool: 'rect',     // rect, circle, pen, eraser, crop
+    currentTool: 'rect',     // rect, circle, pen, eraser, crop, text
     currentColor: '#ff1f1f',  // 默认红笔
+    currentFont: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    currentFontSize: 24,     // 文字字号（像素，相对于显示区域高度，提交时归一化）
     shapes: [],              // 存储所有已画好的标注图形
     undoHistory: [],         // 撤销快照栈，每步保存 shapes 的浅拷贝，最多 10 步
     activeShape: null,       // 正在画的图形 (指针未抬起)
@@ -53,6 +55,45 @@
     }
   }
 
+  // 取消文字编辑（不提交）
+  function cancelTextEdit() {
+    const container = document.getElementById('textEditorContainer');
+    if (container) container.hidden = true;
+  }
+
+  // 将文字编辑器内容提交为 text 图形
+  function commitText() {
+    const container = document.getElementById('textEditorContainer');
+    const input = document.getElementById('textEditorInput');
+    if (!container || !input || !input.value.trim()) {
+      cancelTextEdit();
+      return;
+    }
+
+    const normX = parseFloat(container.dataset.normX);
+    const normY = parseFloat(container.dataset.normY);
+    // 字号按显示区域高度归一化，保证缩放后视觉尺寸一致
+    const dispH = parseFloat(container.dataset.dispH) || 600;
+    const fontSizeNorm = state.currentFontSize / dispH;
+
+    state.undoHistory.push([...state.shapes]);
+    if (state.undoHistory.length > 10) state.undoHistory.shift();
+
+    state.shapes.push({
+      type: 'text',
+      text: input.value,
+      color: state.currentColor,
+      font: state.currentFont,
+      fontSizeNorm,   // 字号 ÷ 显示区高度，渲染时 × canvas.height
+      x: normX,
+      y: normY,
+    });
+
+    cancelTextEdit();
+    render();
+    UI.log(`插入文字: "${input.value.substring(0, 20)}${input.value.length > 20 ? '…' : ''}"`);
+  }
+
   // 初始化标注模块
   function init() {
     const canvas = UI.elements.annotationCanvas;
@@ -78,6 +119,17 @@
             state.cropBox = null;
             render();
           }
+        }
+
+        // 文字工具：显示选项栏并改光标；切走时隐藏选项栏和编辑器
+        const textBar = document.getElementById('textOptionsBar');
+        if (state.currentTool === 'text') {
+          if (textBar) textBar.hidden = false;
+          canvas.style.cursor = 'text';
+        } else {
+          if (textBar) textBar.hidden = true;
+          cancelTextEdit();
+          canvas.style.cursor = '';
         }
 
         UI.log(`切换到工具: ${state.currentTool}`);
@@ -169,6 +221,45 @@
       });
     }
 
+    // 文字工具：字体/字号选择器
+    const textFontSelect = document.getElementById('textFontSelect');
+    if (textFontSelect) {
+      textFontSelect.addEventListener('change', () => {
+        state.currentFont = textFontSelect.value;
+      });
+    }
+    const textSizeSelect = document.getElementById('textSizeSelect');
+    if (textSizeSelect) {
+      textSizeSelect.addEventListener('change', () => {
+        state.currentFontSize = parseInt(textSizeSelect.value, 10);
+      });
+    }
+
+    // 文字编辑器确认/取消按钮
+    const textConfirmBtn = document.getElementById('textConfirmBtn');
+    if (textConfirmBtn) textConfirmBtn.addEventListener('click', commitText);
+    const textCancelBtn = document.getElementById('textCancelBtn');
+    if (textCancelBtn) textCancelBtn.addEventListener('click', cancelTextEdit);
+
+    // 文字输入框：Enter 确认，Shift+Enter 换行，Escape 取消；自动撑高
+    const textEditorInput = document.getElementById('textEditorInput');
+    if (textEditorInput) {
+      textEditorInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          commitText();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelTextEdit();
+        }
+      });
+      textEditorInput.addEventListener('input', () => {
+        // 自动撑高 textarea
+        textEditorInput.style.height = 'auto';
+        textEditorInput.style.height = textEditorInput.scrollHeight + 'px';
+      });
+    }
+
     // 画布指针事件绑定
     canvas.addEventListener('pointerdown', handlePointerDown);
     canvas.addEventListener('pointermove', handlePointerMove);
@@ -218,6 +309,39 @@
     canvas.setPointerCapture(e.pointerId);
     
     const pt = getNormalizedPoint(e);
+
+    // 文字工具：在点击位置弹出内联编辑器
+    if (state.currentTool === 'text') {
+      const rect = canvas.getBoundingClientRect();
+      const dispX = pt.x * rect.width;
+      const dispY = pt.y * rect.height;
+
+      const container = document.getElementById('textEditorContainer');
+      const input = document.getElementById('textEditorInput');
+      if (!container || !input) return;
+
+      container.dataset.normX = pt.x;
+      container.dataset.normY = pt.y;
+      container.dataset.dispH = rect.height;
+
+      // 防止编辑器超出右边界
+      const estimatedW = Math.min(240, rect.width - dispX - 10);
+      container.style.left = `${dispX}px`;
+      container.style.top = `${dispY}px`;
+      container.style.maxWidth = `${Math.max(120, estimatedW)}px`;
+
+      input.value = '';
+      input.style.height = 'auto';
+      input.style.color = state.currentColor;
+      input.style.fontFamily = state.currentFont;
+      input.style.fontSize = state.currentFontSize + 'px';
+      input.style.minWidth = Math.min(120, Math.max(80, estimatedW)) + 'px';
+
+      container.hidden = false;
+      // 延迟 focus 以避免 pointerdown 立刻触发 blur
+      setTimeout(() => input.focus(), 30);
+      return;
+    }
 
     if (state.currentTool === 'crop') {
       if (state.cropBox) {
@@ -465,6 +589,27 @@
         }
         ctx.stroke();
       }
+      ctx.restore();
+      return;
+    }
+
+    // 文字图形：直接 fillText，不走 stroke 流程
+    if (shape.type === 'text') {
+      const px = Math.max(12, Math.round(shape.fontSizeNorm * h));
+      ctx.font = `bold ${px}px ${shape.font}`;
+      ctx.fillStyle = shape.color || '#ff1f1f';
+      ctx.textBaseline = 'top';
+      // 轻描边增加可读性（任何背景都清晰）
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
+      const tx = shape.x * w;
+      const ty = shape.y * h;
+      const lineH = px * 1.3;
+      shape.text.split('\n').forEach((line, i) => {
+        ctx.fillText(line, tx, ty + i * lineH);
+      });
       ctx.restore();
       return;
     }
