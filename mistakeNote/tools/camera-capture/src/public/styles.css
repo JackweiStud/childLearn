@@ -51,6 +51,7 @@ body {
   display: flex;
   flex-direction: column;
   padding: 16px;
+  padding-bottom: 72px; /* 给固定底栏留出空间（header 40px + gap 16px + 余量 16px） */
   gap: 14px;
 }
 
@@ -986,25 +987,28 @@ body {
   background: #fdf2f0;
 }
 
-/* ===== 底部日志抽屉 ===== */
+/* ===== 底部日志抽屉（fixed bottom sheet，向上展开遮挡内容，不撑高页面） ===== */
 .log-drawer {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100vw - 32px);
+  max-width: 1568px; /* 1600px - 32px，匹配 app-container */
+  z-index: 300;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
   background: var(--bg-card);
-  box-shadow: var(--shadow-premium);
+  box-shadow: 0 -4px 24px rgba(67, 48, 30, 0.1), var(--shadow-premium);
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse; /* header 锚底，body 向上展开 */
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  margin-top: auto;
+  max-height: 420px;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .log-drawer.collapsed {
-  height: 42px;
-}
-
-.log-drawer.collapsed .drawer-body {
-  display: none;
+  max-height: 42px;
 }
 
 .drawer-header {
@@ -1012,13 +1016,14 @@ body {
   padding: 0 16px;
   background: #f5ede0;
   border: none;
-  border-bottom: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color); /* column-reverse 后 body 在上方，分隔线改为 top */
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
   width: 100%;
   text-align: left;
+  flex-shrink: 0;
 }
 
 .drawer-title {
