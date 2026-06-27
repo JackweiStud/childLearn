@@ -7,7 +7,10 @@
     shapes: [],              // 存储所有已画好的标注图形
     activeShape: null,       // 正在画的图形 (指针未抬起)
     cropBox: null,           // 裁剪截图区域（归一化坐标：{start: {x,y}, end: {x,y}}）
-    eraserWidth: 0.03        // 橡皮擦宽度（归一化百分比）
+    eraserWidth: 0.03,       // 橡皮擦宽度（归一化百分比）
+    dragHandle: null,        // 当前正在拖拽的控制点或移动标志
+    dragStartPoint: null,    // 拖拽起始点归一化坐标
+    dragStartBox: null       // 拖拽起始时裁剪框的归一化范围
   };
 
   // 显示截图悬浮操作栏
@@ -207,6 +210,70 @@
     const pt = getNormalizedPoint(e);
 
     if (state.currentTool === 'crop') {
+      if (state.cropBox) {
+        // 计算把手像素位置
+        const rect = canvas.getBoundingClientRect();
+        const clickX = pt.x * rect.width;
+        const clickY = pt.y * rect.height;
+        
+        const x1 = Math.min(state.cropBox.start.x, state.cropBox.end.x) * rect.width;
+        const y1 = Math.min(state.cropBox.start.y, state.cropBox.end.y) * rect.height;
+        const x2 = Math.max(state.cropBox.start.x, state.cropBox.end.x) * rect.width;
+        const y2 = Math.max(state.cropBox.start.y, state.cropBox.end.y) * rect.height;
+        const xc = (x1 + x2) / 2;
+        const yc = (y1 + y2) / 2;
+
+        const handles = {
+          TL: { x: x1, y: y1 },
+          TC: { x: xc, y: y1 },
+          TR: { x: x2, y: y1 },
+          ML: { x: x1, y: yc },
+          MR: { x: x2, y: yc },
+          BL: { x: x1, y: y2 },
+          BC: { x: xc, y: y2 },
+          BR: { x: x2, y: y2 }
+        };
+
+        // 检测是否点中了 8 个控制点之一（判定阈值 12 像素）
+        let hitHandle = null;
+        const threshold = 12;
+        for (const [name, pos] of Object.entries(handles)) {
+          const dist = Math.hypot(clickX - pos.x, clickY - pos.y);
+          if (dist <= threshold) {
+            hitHandle = name;
+            break;
+          }
+        }
+
+        if (hitHandle) {
+          state.dragHandle = hitHandle;
+          state.dragStartPoint = pt;
+          state.dragStartBox = {
+            x1: Math.min(state.cropBox.start.x, state.cropBox.end.x),
+            y1: Math.min(state.cropBox.start.y, state.cropBox.end.y),
+            x2: Math.max(state.cropBox.start.x, state.cropBox.end.x),
+            y2: Math.max(state.cropBox.start.y, state.cropBox.end.y)
+          };
+          hideCropToolbar();
+          return;
+        }
+
+        // 检测是否点中了截图框内部以进行整体拖拽移动
+        const nX1 = Math.min(state.cropBox.start.x, state.cropBox.end.x);
+        const nY1 = Math.min(state.cropBox.start.y, state.cropBox.end.y);
+        const nX2 = Math.max(state.cropBox.start.x, state.cropBox.end.x);
+        const nY2 = Math.max(state.cropBox.start.y, state.cropBox.end.y);
+        
+        if (pt.x >= nX1 && pt.x <= nX2 && pt.y >= nY1 && pt.y <= nY2) {
+          state.dragHandle = 'MOVE';
+          state.dragStartPoint = pt;
+          state.dragStartBox = { x1: nX1, y1: nY1, x2: nX2, y2: nY2 };
+          hideCropToolbar();
+          return;
+        }
+      }
+
+      // 如果点在其他位置，则开始绘制一个新的截图框
       hideCropToolbar();
       state.cropBox = { start: pt, end: pt };
     } else if (state.currentTool === 'eraser') {
@@ -235,7 +302,67 @@
   // 指针移动中
   function handlePointerMove(e) {
     if (state.currentTool === 'crop') {
-      if (state.cropBox) {
+      if (state.dragHandle) {
+        const pt = getNormalizedPoint(e);
+        const dx = pt.x - state.dragStartPoint.x;
+        const dy = pt.y - state.dragStartPoint.y;
+        
+        const { x1, y1, x2, y2 } = state.dragStartBox;
+        let newX1 = x1;
+        let newY1 = y1;
+        let newX2 = x2;
+        let newY2 = y2;
+        
+        const minSize = 0.01; // 最小尺寸限制
+        
+        if (state.dragHandle === 'TL') {
+          newX1 = Math.min(x2 - minSize, x1 + dx);
+          newY1 = Math.min(y2 - minSize, y1 + dy);
+        } else if (state.dragHandle === 'TC') {
+          newY1 = Math.min(y2 - minSize, y1 + dy);
+        } else if (state.dragHandle === 'TR') {
+          newX2 = Math.max(x1 + minSize, x2 + dx);
+          newY1 = Math.min(y2 - minSize, y1 + dy);
+        } else if (state.dragHandle === 'ML') {
+          newX1 = Math.min(x2 - minSize, x1 + dx);
+        } else if (state.dragHandle === 'MR') {
+          newX2 = Math.max(x1 + minSize, x2 + dx);
+        } else if (state.dragHandle === 'BL') {
+          newX1 = Math.min(x2 - minSize, x1 + dx);
+          newY2 = Math.max(y1 + minSize, y2 + dy);
+        } else if (state.dragHandle === 'BC') {
+          newY2 = Math.max(y1 + minSize, y2 + dy);
+        } else if (state.dragHandle === 'BR') {
+          newX2 = Math.max(x1 + minSize, x2 + dx);
+          newY2 = Math.max(y1 + minSize, y2 + dy);
+        } else if (state.dragHandle === 'MOVE') {
+          const w = x2 - x1;
+          const h = y2 - y1;
+          newX1 = x1 + dx;
+          newY1 = y1 + dy;
+          
+          // 整体平移边界约束
+          if (newX1 < 0) newX1 = 0;
+          if (newY1 < 0) newY1 = 0;
+          if (newX1 + w > 1) newX1 = 1 - w;
+          if (newY1 + h > 1) newY1 = 1 - h;
+          
+          newX2 = newX1 + w;
+          newY2 = newY1 + h;
+        }
+        
+        // 确保数值在合法归一化区间内 [0, 1]
+        newX1 = Math.max(0, Math.min(1, newX1));
+        newY1 = Math.max(0, Math.min(1, newY1));
+        newX2 = Math.max(0, Math.min(1, newX2));
+        newY2 = Math.max(0, Math.min(1, newY2));
+        
+        state.cropBox = {
+          start: { x: newX1, y: newY1 },
+          end: { x: newX2, y: newY2 }
+        };
+        render();
+      } else if (state.cropBox) {
         state.cropBox.end = getNormalizedPoint(e);
         render();
       }
@@ -256,6 +383,14 @@
   // 指针抬起完成
   function handlePointerUp() {
     if (state.currentTool === 'crop') {
+      if (state.dragHandle) {
+        state.dragHandle = null;
+        state.dragStartPoint = null;
+        state.dragStartBox = null;
+        showCropToolbar();
+        return;
+      }
+      
       // 截图区域结束
       if (state.cropBox) {
         // 防止点按产生极小区域，做极小范围过滤
@@ -400,6 +535,35 @@
       ctx.fillRect(0, top, left, height); // 左
       ctx.fillRect(left + width, top, w - (left + width), height); // 右
       
+      
+      // 绘制 8 个控制把手
+      const handleRadius = 6;
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]); // 把手使用实线绘制
+      
+      const xc = left + width / 2;
+      const yc = top + height / 2;
+      
+      const handlePoints = [
+        { x: left, y: top },          // TL
+        { x: xc, y: top },            // TC
+        { x: left + width, y: top },    // TR
+        { x: left, y: yc },           // ML
+        { x: left + width, y: yc },    // MR
+        { x: left, y: top + height },   // BL
+        { x: xc, y: top + height },      // BC
+        { x: left + width, y: top + height } // BR
+      ];
+      
+      for (const pt of handlePoints) {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, handleRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
       ctx.restore();
     }
   }
