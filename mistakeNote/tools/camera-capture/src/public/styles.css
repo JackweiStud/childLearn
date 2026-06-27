@@ -314,8 +314,9 @@ body {
 }
 
 .left-toolbar.collapsed {
-  transform: translateX(-115%);
-  opacity: 0.85;
+  /* calc(-100% - left偏移28px) 确保整个工具栏完整滑出 preview-wrap 左边缘 */
+  transform: translateX(calc(-100% - 32px));
+  opacity: 0;
 }
 
 /* ===== 边缘折叠手把（独立于栏，贴画板左右边缘） ===== */
@@ -333,14 +334,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.85);
   padding: 0;
   transition: background 0.2s, color 0.2s;
 }
 
 .edge-toggle:hover {
   background: rgba(40, 33, 24, 0.92);
-  color: var(--primary-accent);
+  color: white;
 }
 
 .edge-toggle .arrow-icon {
