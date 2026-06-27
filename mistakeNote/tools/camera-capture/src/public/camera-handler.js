@@ -213,6 +213,8 @@
       UI.elements.preview.hidden = false;
       UI.elements.nativePreview.hidden = true;
       UI.elements.standbyOverlay.hidden = true;
+      // 显示 A4 参考框
+      document.querySelector('.preview-wrap')?.classList.add('camera-live');
 
       // 启用按钮状态
       UI.elements.startCameraButton.disabled = true;
@@ -262,6 +264,8 @@
       UI.elements.preview.hidden = true;
       UI.elements.nativePreview.hidden = false;
       UI.elements.standbyOverlay.hidden = true;
+      // 显示 A4 参考框
+      document.querySelector('.preview-wrap')?.classList.add('camera-live');
 
       UI.elements.startCameraButton.disabled = true;
       UI.elements.stopCameraButton.disabled = false;
@@ -324,11 +328,12 @@
     state.currentDeviceId = '';
     state.lastQuality = { exposure: 'unknown', brightness: 0 };
 
-    // 恢复按钮状态
+    // 恢复按钮状态，隐藏 A4 参考框
     UI.elements.startCameraButton.disabled = false;
     UI.elements.stopCameraButton.disabled = true;
     UI.elements.captureButton.disabled = true;
     UI.elements.standbyOverlay.hidden = false;
+    document.querySelector('.preview-wrap')?.classList.remove('camera-live');
     UI.elements.actualResolution.textContent = '实际分辨率: --';
     
     // 清空调节面板并显示不支持
@@ -742,6 +747,23 @@
       // 生成最终待保存的 JPG 像素
       const frame = generateCaptureFrame();
       
+      // 触发快门闪屏特效
+      if (UI.elements.shutterFlash) {
+        UI.elements.shutterFlash.hidden = false;
+        UI.elements.shutterFlash.classList.add('flash-active');
+        const onFlashEnd = () => {
+          UI.elements.shutterFlash.hidden = true;
+          UI.elements.shutterFlash.classList.remove('flash-active');
+          UI.elements.shutterFlash.removeEventListener('animationend', onFlashEnd);
+        };
+        UI.elements.shutterFlash.addEventListener('animationend', onFlashEnd);
+      }
+
+      // 读取元数据标签预设值
+      const subject = UI.elements.presetSubject ? UI.elements.presetSubject.value : 'math';
+      const difficulty = UI.elements.presetDifficulty ? UI.elements.presetDifficulty.value : 'none';
+      const notes = UI.elements.presetNotes ? UI.elements.presetNotes.value : '';
+
       // 保存到本地
       const response = await fetch('/api/captures', {
         method: 'POST',
@@ -751,6 +773,9 @@
           width: frame.width,
           height: frame.height,
           deviceLabel: state.currentDeviceLabel,
+          subject,
+          difficulty,
+          notes,
           quality: {
             exposure: state.lastQuality.exposure,
             brightness: state.lastQuality.brightness,
@@ -770,14 +795,19 @@
       }
 
       // 清除截图选区以防阻碍下次拍照
-      if (window.AnnotationHandler && window.AnnotationHandler.state.cropBox) {
+      if (window.AnnotationHandler) {
         window.AnnotationHandler.state.cropBox = null;
+        if (typeof window.AnnotationHandler.hideCropToolbar === 'function') {
+          window.AnnotationHandler.hideCropToolbar();
+        }
         window.AnnotationHandler.render();
       }
 
       UI.setStatus(`已成功拍照并保存: ${data.imagePath}`, 'ok');
+      UI.showToast('拍照并保存成功！', 'success');
     } catch (err) {
       UI.setStatus(`拍照失败: ${err.message}`, 'error');
+      UI.showToast(`拍照失败: ${err.message}`, 'error');
     } finally {
       UI.elements.captureButton.disabled = false;
     }

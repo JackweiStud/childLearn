@@ -33,6 +33,16 @@
     hardwareControlsWrapper: document.getElementById('hardwareControlsWrapper'),
     softwareControlsWrapper: document.getElementById('softwareControlsWrapper'),
     unsupportedControlsHint: document.getElementById('unsupportedControlsHint'),
+    presetSubject: document.getElementById('presetSubject'),
+    presetDifficulty: document.getElementById('presetDifficulty'),
+    presetNotes: document.getElementById('presetNotes'),
+    shutterFlash: document.getElementById('shutterFlash'),
+    toastContainer: document.getElementById('toastContainer'),
+    a4GuideMode: document.getElementById('a4GuideMode'),
+    a4Guide: document.getElementById('a4Guide'),
+    cropActionToolbar: document.getElementById('cropActionToolbar'),
+    cropConfirmButton: document.getElementById('cropConfirmButton'),
+    cropCancelButton: document.getElementById('cropCancelButton'),
   };
 
   // 控制台日志功能
@@ -54,6 +64,26 @@
     log(message, tone === 'error' ? 'error' : tone === 'warn' ? 'warn' : 'info');
   }
 
+  // 显示悬浮 Toast 消息
+  function showToast(message, type = 'success') {
+    if (!elements.toastContainer) return;
+    const toast = document.createElement('div');
+    toast.className = `toast-item toast-${type}`;
+    
+    // 成功/失败图标
+    const iconSvg = type === 'success' 
+      ? `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 7L6 8.5L9.5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      : `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 4.5L9.5 9.5M9.5 4.5L4.5 9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+    toast.innerHTML = `${iconSvg}<span>${message}</span>`;
+    elements.toastContainer.appendChild(toast);
+    
+    // 播放动画完毕后自动销毁
+    toast.addEventListener('animationend', () => {
+      toast.remove();
+    });
+  }
+
   // 绑定折叠底栏日志事件
   if (elements.toggleLogButton && elements.logDrawer) {
     elements.toggleLogButton.addEventListener('click', () => {
@@ -68,6 +98,7 @@
   root.UI = {
     elements,
     log,
-    setStatus
+    setStatus,
+    showToast
   };
 })(window);

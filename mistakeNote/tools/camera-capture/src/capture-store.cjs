@@ -61,7 +61,7 @@ function nextSequence(dir, timestamp, slug, extension) {
 function createCaptureStore({ repoRoot = path.resolve(__dirname, '..', '..', '..'), now = () => new Date() } = {}) {
   const scansRoot = path.join(repoRoot, '_inbox', 'scans');
 
-  async function saveCapture({ imageBuffer, mimeType, deviceLabel = 'Unknown Camera', width, height, quality = {} }) {
+  async function saveCapture({ imageBuffer, mimeType, deviceLabel = 'Unknown Camera', width, height, quality = {}, subject = 'math', difficulty = 'none', notes = '' }) {
     if (!Buffer.isBuffer(imageBuffer) || imageBuffer.length === 0) {
       throw new Error('imageBuffer must be a non-empty Buffer');
     }
@@ -92,7 +92,9 @@ function createCaptureStore({ repoRoot = path.resolve(__dirname, '..', '..', '..
       stage: 'raw_scan',
       status: 'unprocessed',
       quality,
-      notes: '',
+      subject,
+      difficulty,
+      notes,
     };
     fs.writeFileSync(metaPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
 

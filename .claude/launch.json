@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "camera-capture",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["mistakeNote/tools/camera-capture/src/server.cjs"],
+      "port": 8731,
+      "autoPort": false
+    }
+  ]
+}

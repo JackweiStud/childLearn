@@ -97,6 +97,9 @@ async function handleCapture(req, res) {
       width: Number(body.width),
       height: Number(body.height),
       quality: body.quality || {},
+      subject: body.subject,
+      difficulty: body.difficulty,
+      notes: body.notes,
     });
     sendJson(res, 201, {
       imagePath: result.relativeImagePath,
@@ -104,6 +107,34 @@ async function handleCapture(req, res) {
       imageUrl: `/scans/${result.relativeImagePath.replace(/^_inbox\/scans\//, '')}`,
       meta: result.meta,
     });
+  } catch (error) {
+    sendError(res, 400, error.message);
+  }
+}
+
+async function handleDeleteCapture(req, res) {
+  try {
+    const body = JSON.parse(await readRequestBody(req, 1024 * 1024));
+    const imageFilePath = safeJoin(repoRoot, body.filePath);
+    if (!imageFilePath || !imageFilePath.startsWith(store.scansRoot)) {
+      sendError(res, 400, 'Invalid file path or permission denied');
+      return;
+    }
+
+    const parsedPath = path.parse(imageFilePath);
+    const metaFilePath = path.join(parsedPath.dir, `${parsedPath.name}.json`);
+
+    let deletedCount = 0;
+    if (fs.existsSync(imageFilePath)) {
+      fs.unlinkSync(imageFilePath);
+      deletedCount++;
+    }
+    if (fs.existsSync(metaFilePath)) {
+      fs.unlinkSync(metaFilePath);
+      deletedCount++;
+    }
+
+    sendJson(res, 200, { success: true, deleted: imageFilePath, deletedCount });
   } catch (error) {
     sendError(res, 400, error.message);
   }
@@ -285,7 +316,7 @@ async function readImageDimensions(imagePath) {
   return parseFfprobeDimensions(stdout);
 }
 
-async function captureAvfoundationFrame({ deviceIndex, deviceLabel }) {
+async function captureAvfoundationFrame({ deviceIndex, deviceLabel, subject, difficulty, notes }) {
   if (!Number.isInteger(deviceIndex) || deviceIndex < 0) {
     throw new Error('deviceIndex must be a non-negative integer');
   }
@@ -311,6 +342,9 @@ async function captureAvfoundationFrame({ deviceIndex, deviceLabel }) {
         capture_mode: 'native-avfoundation',
         avfoundation_index: deviceIndex,
       },
+      subject,
+      difficulty,
+      notes,
     });
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -333,6 +367,9 @@ async function handleNativeCapture(req, res) {
     const result = await captureAvfoundationFrame({
       deviceIndex,
       deviceLabel: body.deviceLabel || `AVFoundation Camera ${deviceIndex}`,
+      subject: body.subject,
+      difficulty: body.difficulty,
+      notes: body.notes,
     });
     sendJson(res, 201, {
       imagePath: result.relativeImagePath,
@@ -488,6 +525,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/captures') {
     handleCapture(req, res);
+    return;
+  }
+
+  if (req.method === 'DELETE' && url.pathname === '/api/captures') {
+    handleDeleteCapture(req, res);
     return;
   }
 

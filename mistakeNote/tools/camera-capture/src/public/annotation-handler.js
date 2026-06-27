@@ -10,6 +10,44 @@
     eraserWidth: 0.03        // 橡皮擦宽度（归一化百分比）
   };
 
+  // 显示截图悬浮操作栏
+  function showCropToolbar() {
+    if (!state.cropBox || !UI.elements.cropActionToolbar) return;
+    const canvas = UI.elements.annotationCanvas;
+    const rect = canvas.getBoundingClientRect();
+    
+    const x1 = Math.min(state.cropBox.start.x, state.cropBox.end.x) * rect.width;
+    const y1 = Math.min(state.cropBox.start.y, state.cropBox.end.y) * rect.height;
+    const x2 = Math.max(state.cropBox.start.x, state.cropBox.end.x) * rect.width;
+    const y2 = Math.max(state.cropBox.start.y, state.cropBox.end.y) * rect.height;
+    
+    // 定位在截图框正下方，如果贴底，则显示在正上方
+    let top = y2 + 10;
+    const toolbarHeight = 45;
+    if (top + toolbarHeight > rect.height) {
+      top = y1 - toolbarHeight - 10;
+      if (top < 0) top = 10;
+    }
+    
+    // 水平居中
+    const width = x2 - x1;
+    const toolbarWidth = 180;
+    let left = x1 + width / 2 - toolbarWidth / 2;
+    if (left < 10) left = 10;
+    if (left + toolbarWidth > rect.width) left = rect.width - toolbarWidth - 10;
+    
+    UI.elements.cropActionToolbar.style.left = `${left}px`;
+    UI.elements.cropActionToolbar.style.top = `${top}px`;
+    UI.elements.cropActionToolbar.hidden = false;
+  }
+
+  // 隐藏截图悬浮操作栏
+  function hideCropToolbar() {
+    if (UI.elements.cropActionToolbar) {
+      UI.elements.cropActionToolbar.hidden = true;
+    }
+  }
+
   // 初始化标注模块
   function init() {
     const canvas = UI.elements.annotationCanvas;
@@ -27,6 +65,15 @@
         UI.elements.annotationToolbar.querySelectorAll('button[data-tool]').forEach(b => {
           b.classList.toggle('active', b === btn);
         });
+
+        // 如果切换为非截图工具，清空截图框并隐藏操作栏
+        if (state.currentTool !== 'crop') {
+          hideCropToolbar();
+          if (state.cropBox) {
+            state.cropBox = null;
+            render();
+          }
+        }
 
         UI.log(`切换到工具: ${state.currentTool}`);
       });
@@ -77,6 +124,7 @@
           UI.log('已撤销上一个标注');
         } else if (state.cropBox) {
           state.cropBox = null;
+          hideCropToolbar();
           render();
           UI.log('已清除截图区域');
         }
@@ -89,8 +137,27 @@
         state.shapes = [];
         state.activeShape = null;
         state.cropBox = null;
+        hideCropToolbar();
         render();
         UI.log('清空所有标注与截图框');
+      });
+    }
+
+    // 绑定截图悬浮操作栏按钮
+    if (UI.elements.cropConfirmButton) {
+      UI.elements.cropConfirmButton.addEventListener('click', () => {
+        hideCropToolbar();
+        if (window.CameraHandler) {
+          window.CameraHandler.capture();
+        }
+      });
+    }
+    if (UI.elements.cropCancelButton) {
+      UI.elements.cropCancelButton.addEventListener('click', () => {
+        hideCropToolbar();
+        state.cropBox = null;
+        render();
+        UI.log('已取消选区截图');
       });
     }
 
@@ -140,6 +207,7 @@
     const pt = getNormalizedPoint(e);
 
     if (state.currentTool === 'crop') {
+      hideCropToolbar();
       state.cropBox = { start: pt, end: pt };
     } else if (state.currentTool === 'eraser') {
       state.activeShape = {
@@ -196,14 +264,11 @@
         if (dx < 0.01 || dy < 0.01) {
           state.cropBox = null;
           UI.log('选择区域过小，已取消截图框');
+          hideCropToolbar();
         } else {
-          // 选区有效，先渲染截图框再自动触发保存
+          // 选区有效，渲染截图框并显示悬浮操作栏
           render();
-          UI.log('截图选区已确认，正在自动保存选区截图...');
-          if (window.CameraHandler) {
-            window.CameraHandler.capture();
-          }
-          return;
+          showCropToolbar();
         }
       }
       render();
@@ -361,6 +426,7 @@
     state,
     render,
     resizeCanvas,
-    drawOnCapture
+    drawOnCapture,
+    hideCropToolbar
   };
 })(window);

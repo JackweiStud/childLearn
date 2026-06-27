@@ -32,6 +32,9 @@ test('保存 USB 摄像头抓拍为按日期分类的 JPG 和同名 JSON 元数�
       exposure: 'ok',
       brightness: 132,
     },
+    subject: 'english',
+    difficulty: 'hard',
+    notes: 'Unit test preset note',
   });
 
   assert.equal(result.relativeImagePath, '_inbox/scans/2026-06-24/20260624-210501-usb-camera-001.jpg');
@@ -46,6 +49,9 @@ test('保存 USB 摄像头抓拍为按日期分类的 JPG 和同名 JSON 元数�
   assert.equal(meta.height, 1080);
   assert.equal(meta.stage, 'raw_scan');
   assert.equal(meta.status, 'unprocessed');
+  assert.equal(meta.subject, 'english');
+  assert.equal(meta.difficulty, 'hard');
+  assert.equal(meta.notes, 'Unit test preset note');
   assert.deepEqual(meta.quality, { exposure: 'ok', brightness: 132 });
 });
 

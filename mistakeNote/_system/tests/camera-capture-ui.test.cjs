@@ -95,3 +95,34 @@ test('拍照台支持系统级原生取景会话管理，并在停止时通知�
   assert.match(stylesCss, /\.preview-wrap video,\s*\.preview-wrap \.native-preview/);
   assert.match(stylesCss, /\[hidden\]/);
 });
+
+test('拍照台支持错题元数据预设、多态 A4 辅助线切换、快门闪屏/Toast 反馈与最近拍摄删除', () => {
+  // 元数据预设元素
+  assert.match(indexHtml, /id="presetSubject"/);
+  assert.match(indexHtml, /id="presetDifficulty"/);
+  assert.match(indexHtml, /id="presetNotes"/);
+  assert.match(uiJs, /presetSubject:\s*document\.getElementById/);
+  assert.match(cameraJs, /presetSubject/);
+
+  // A4 参考框多态切换
+  assert.match(indexHtml, /id="a4GuideMode"/);
+  assert.match(indexHtml, /id="a4Guide"/);
+  assert.match(uiJs, /a4GuideMode:\s*document\.getElementById/);
+  assert.match(appJs, /a4GuideMode\.addEventListener\('change'/);
+  assert.match(stylesCss, /\.a4-guide\.a4-portrait/);
+  assert.match(stylesCss, /\.a4-guide\.a4-landscape/);
+  assert.match(stylesCss, /\.a4-guide\.a4-off/);
+
+  // 快门与 Toast 提示
+  assert.match(indexHtml, /id="toastContainer"/);
+  assert.match(indexHtml, /id="shutterFlash"/);
+  assert.match(uiJs, /showToast/);
+  assert.match(cameraJs, /shutterFlash/);
+  assert.match(stylesCss, /\.shutter-flash/);
+  assert.match(stylesCss, /\.toast-container/);
+
+  // 最近拍摄删除
+  assert.match(recentJs, /delete-btn/);
+  assert.match(recentJs, /method:\s*'DELETE'/);
+  assert.match(stylesCss, /\.delete-btn/);
+});

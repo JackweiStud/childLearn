@@ -132,18 +132,26 @@ body {
 
 .vertical-buttons button {
   width: 100%;
-  height: 50px;
+  height: 54px;
   border-radius: var(--border-radius-md);
   border: 1px solid var(--border-color);
   background: #fdfcf9;
   color: var(--text-main);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 3px;
   transition: all 0.2s ease;
+}
+
+.vertical-buttons button span {
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.02em;
 }
 
 .vertical-buttons button:hover {
@@ -244,6 +252,11 @@ body {
   color: #ef4444;
 }
 
+/* action-btn 支持 SVG 图标 + 文字横排 */
+.action-btn svg {
+  flex-shrink: 0;
+}
+
 /* 2. Center Workspace (Preview) */
 .center-workspace {
   display: flex;
@@ -310,8 +323,13 @@ body {
   padding: 24px;
 }
 
+.standby-camera-icon {
+  opacity: 0.5;
+  margin-bottom: 4px;
+}
+
 .standby-overlay strong {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
@@ -321,9 +339,9 @@ body {
   font-size: 13px;
 }
 
+/* A4 参考框：默认隐藏，仅在摄像头开启（.camera-live）后淡入 */
 .a4-guide {
   position: absolute;
-  inset: 8% 25%;
   border: 2px dashed rgba(217, 119, 6, 0.7);
   border-radius: 8px;
   pointer-events: none;
@@ -331,6 +349,25 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
+  opacity: 0;
+  transition: opacity 0.4s ease, inset 0.3s ease;
+}
+
+.a4-guide.a4-portrait {
+  inset: 8% 25%;
+}
+
+.a4-guide.a4-landscape {
+  inset: 18% 12%;
+}
+
+.a4-guide.a4-off {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+.preview-wrap.camera-live .a4-guide {
+  opacity: 1;
 }
 
 .a4-guide span {
@@ -432,11 +469,34 @@ body {
   border-color: var(--primary-accent);
   font-weight: 700;
   box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
+  gap: 6px;
 }
 
 .control-btn.primary-btn:hover {
   background: var(--primary-accent-hover);
   box-shadow: 0 6px 16px rgba(217, 119, 6, 0.3);
+}
+
+/* 拍照按钮内的 SVG 图标 */
+.control-btn svg {
+  flex-shrink: 0;
+}
+
+/* 拍摄计数徽章 */
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--primary-accent);
+  color: white;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 /* 3. Right Sidebar Panel */
@@ -491,7 +551,8 @@ body {
   color: var(--text-muted);
 }
 
-.styled-select {
+.styled-select,
+.styled-input {
   width: 100%;
   height: 36px;
   padding: 0 10px;
@@ -501,6 +562,14 @@ body {
   color: var(--text-main);
   font-size: 12px;
   outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.styled-select:focus,
+.styled-input:focus {
+  border-color: var(--primary-accent);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
 }
 
 /* Camera Quality Adjustments */
@@ -662,6 +731,16 @@ body {
 .recent-item button:hover {
   border-color: var(--text-muted);
   background: #f9f6f0;
+}
+
+.recent-item button.delete-btn {
+  color: #c2410c;
+  border-color: rgba(194, 65, 12, 0.2);
+}
+
+.recent-item button.delete-btn:hover {
+  border-color: #c2410c;
+  background: #fdf2f0;
 }
 
 /* 4. Bottom Log Drawer */
@@ -837,4 +916,117 @@ body {
   .log-column.full-width {
     grid-column: 1;
   }
+}
+
+/* 快门闪屏特效 */
+.shutter-flash {
+  position: absolute;
+  inset: 0;
+  background: white;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+.shutter-flash.flash-active {
+  animation: shutter-flash-animation 0.15s ease-out;
+}
+@keyframes shutter-flash-animation {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+/* Toast 提示横幅 */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.toast-item {
+  background: rgba(25, 22, 19, 0.95);
+  color: #faf6f0;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  animation: toast-enter-exit 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+.toast-item.toast-success {
+  border-left: 4px solid var(--primary-accent);
+}
+.toast-item.toast-error {
+  border-left: 4px solid #ef4444;
+}
+@keyframes toast-enter-exit {
+  0% { transform: translateY(-30px); opacity: 0; }
+  8% { transform: translateY(0); opacity: 1; }
+  92% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-30px); opacity: 0; }
+}
+
+/* 截图确认悬浮操作栏 */
+.crop-action-toolbar {
+  position: absolute;
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+  background: rgba(25, 22, 19, 0.95);
+  padding: 6px;
+  border-radius: 20px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: auto;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.crop-action-toolbar[hidden] {
+  display: none !important;
+}
+
+.crop-action-toolbar button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background-color 0.15s, transform 0.1s;
+}
+
+.crop-action-toolbar button:active {
+  transform: scale(0.95);
+}
+
+.crop-btn-confirm {
+  background: var(--primary-accent);
+  color: white;
+}
+
+.crop-btn-confirm:hover {
+  background: var(--primary-accent-hover);
+}
+
+.crop-btn-cancel {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e3dcd5;
+}
+
+.crop-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
 }

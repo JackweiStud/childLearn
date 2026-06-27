@@ -91,5 +91,43 @@
         UI.setStatus('已选择摄像头设备。请点击”开启摄像头”按钮开始预览。', 'normal');
       }
     });
+
+    // 切换 A4 参考框辅助线模式
+    if (UI.elements.a4GuideMode && UI.elements.a4Guide) {
+      UI.elements.a4GuideMode.addEventListener('change', () => {
+        const mode = UI.elements.a4GuideMode.value;
+        UI.elements.a4Guide.classList.remove('a4-portrait', 'a4-landscape', 'a4-off');
+        if (mode === 'portrait') {
+          UI.elements.a4Guide.classList.add('a4-portrait');
+        } else if (mode === 'landscape') {
+          UI.elements.a4Guide.classList.add('a4-landscape');
+        } else if (mode === 'off') {
+          UI.elements.a4Guide.classList.add('a4-off');
+        }
+        UI.log(`A4参考线模式变更为: ${mode}`);
+      });
+    }
+
+    // 键盘快捷键：⌘S 拍照、⌘Z 撤销、ESC 清空标注
+    document.addEventListener('keydown', (e) => {
+      // 焦点在输入框时不拦截
+      if (e.target.matches('input, select, textarea')) return;
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (!UI.elements.captureButton.disabled) {
+          UI.elements.captureButton.click();
+        }
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        e.preventDefault();
+        UI.elements.undoButton.click();
+        return;
+      }
+      if (e.key === 'Escape') {
+        UI.elements.clearAnnotationsButton.click();
+      }
+    });
   }
 })();
