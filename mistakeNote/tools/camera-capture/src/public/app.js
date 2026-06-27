@@ -1,6 +1,7 @@
 const deviceSelect = document.getElementById('deviceSelect');
 const resolutionMode = document.getElementById('resolutionMode');
 const preview = document.getElementById('preview');
+const nativePreview = document.getElementById('nativePreview');
 const annotationCanvas = document.getElementById('annotationCanvas');
 const startCameraButton = document.getElementById('startCameraButton');
 const stopCameraButton = document.getElementById('stopCameraButton');
@@ -12,6 +13,12 @@ const actualResolution = document.getElementById('actualResolution');
 const controlsHint = document.getElementById('controlsHint');
 const controlsList = document.getElementById('controlsList');
 const softwareControlsList = document.getElementById('softwareControlsList');
+const browserDevicesList = document.getElementById('browserDevicesList');
+const systemDevicesList = document.getElementById('systemDevicesList');
+const systemDeviceSelect = document.getElementById('systemDeviceSelect');
+const startNativePreviewButton = document.getElementById('startNativePreviewButton');
+const stopNativePreviewButton = document.getElementById('stopNativePreviewButton');
+const nativeCaptureButton = document.getElementById('nativeCaptureButton');
 const recentList = document.getElementById('recentList');
 const scratchCanvas = document.getElementById('scratchCanvas');
 const standbyOverlay = document.getElementById('standbyOverlay');
@@ -27,6 +34,14 @@ let softwareAdjustments = CaptureEffects.normalizeSoftwareAdjustments();
 let annotationTool = 'rect';
 let annotations = [];
 let activeAnnotation = null;
+let nativePreviewActive = false;
+let currentNativeDeviceLabel = '';
+let nativePreviewSessionId = '';
+let nativePreviewRefreshTimer = null;
+let nativePreviewObjectUrl = '';
+let nativePreviewFrameLoading = false;
+
+const continuityCameraLabels = ['jack’s iPhone Camera', 'jack’s iPhone Desk View Camera'];
 
 const numericControls = [
   { key: 'zoom', label: '缩放' },
@@ -73,6 +88,106 @@ async function enumerateVideoDevices() {
   return devices;
 }
 
+function renderList(listElement, items, emptyText, missingLabels = []) {
+  listElement.innerHTML = '';
+  if (!items.length) {
+    const item = document.createElement('li');
+    item.textContent = emptyText;
+    listElement.append(item);
+    return;
+  }
+  for (const itemText of items) {
+    const item = document.createElement('li');
+    item.textContent = itemText;
+    item.dataset.missing = missingLabels.some((label) => itemText.includes(label)) ? 'true' : 'false';
+    listElement.append(item);
+  }
+}
+
+async function fetchSystemCameras() {
+  try {
+    const response = await fetch('/api/system-cameras');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    return {
+      devices: [],
+      warning: `系统摄像头诊断失败: ${error.message}`,
+    };
+  }
+}
+
+function renderDeviceDiagnostics(systemCameraPayload = { devices: [] }) {
+  const browserLabels = devices.map((device, index) => (
+    device.label || `浏览器摄像头 ${index + 1}`
+  ));
+  const systemLabels = (systemCameraPayload.devices || []).map((device) => (
+    `[${device.index}] ${device.label}`
+  ));
+  const browserJoined = browserLabels.join('\n');
+  const missingContinuity = continuityCameraLabels.filter((label) => (
+    systemLabels.some((systemLabel) => systemLabel.includes(label))
+    && !browserJoined.includes(label)
+  ));
+
+  renderList(browserDevicesList, browserLabels, '浏览器暂未暴露摄像头', missingContinuity);
+  renderList(systemDevicesList, systemLabels, systemCameraPayload.warning || '系统暂未发现摄像头');
+  renderSystemDeviceSelect(systemCameraPayload.devices || []);
+
+  if (missingContinuity.length > 0) {
+    setHint(
+      `系统能看到 ${missingContinuity.join(' / ')}，但浏览器没有暴露。先关闭摄像头再刷新；仍不出现就用原生 ffmpeg 采集通道。`,
+      'warn'
+    );
+  }
+}
+
+function renderSystemDeviceSelect(systemDevices) {
+  const previousValue = systemDeviceSelect.value;
+  systemDeviceSelect.innerHTML = '';
+
+  for (const device of systemDevices) {
+    const option = document.createElement('option');
+    option.value = String(device.index);
+    option.textContent = `[${device.index}] ${device.label}`;
+    option.dataset.label = device.label;
+    systemDeviceSelect.append(option);
+  }
+
+  if (systemDevices.length === 0) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = '未发现系统摄像头';
+    systemDeviceSelect.append(option);
+    startNativePreviewButton.disabled = true;
+    stopNativePreviewButton.disabled = true;
+    nativeCaptureButton.disabled = true;
+    return;
+  }
+
+  const iphone = [...systemDeviceSelect.options].find((option) => /iphone camera/i.test(option.dataset.label || ''));
+  if (previousValue && [...systemDeviceSelect.options].some((option) => option.value === previousValue)) {
+    systemDeviceSelect.value = previousValue;
+  } else if (iphone) {
+    systemDeviceSelect.value = iphone.value;
+  }
+  startNativePreviewButton.disabled = false;
+  stopNativePreviewButton.disabled = !nativePreviewActive;
+  nativeCaptureButton.disabled = !nativePreviewActive;
+}
+
+async function refreshDeviceInventory() {
+  const [browserDevices, systemCameraPayload] = await Promise.all([
+    enumerateVideoDevices(),
+    fetchSystemCameras(),
+  ]);
+  renderDeviceDiagnostics(systemCameraPayload);
+  return {
+    browserDevices,
+    systemDevices: systemCameraPayload.devices || [],
+  };
+}
+
 function preferredDeviceId() {
   const usb = devices.find((device) => /usb\s*camera/i.test(device.label));
   return (usb || devices[0])?.deviceId || '';
@@ -86,6 +201,7 @@ function resolutionConstraints() {
 }
 
 async function startCamera(deviceId) {
+  if (nativePreviewActive) stopNativePreview();
   if (stream) {
     for (const track of stream.getTracks()) track.stop();
   }
@@ -107,7 +223,7 @@ async function startCamera(deviceId) {
   startCameraButton.disabled = true;
   stopCameraButton.disabled = false;
   standbyOverlay.hidden = true;
-  await enumerateVideoDevices();
+  await refreshDeviceInventory();
   const active = devices.find((device) => device.label === currentDeviceLabel);
   if (active) deviceSelect.value = active.deviceId;
   renderCameraControls(track);
@@ -123,6 +239,7 @@ function stopCamera() {
   stream = null;
   activeTrack = null;
   preview.srcObject = null;
+  preview.hidden = false;
   actualResolution.textContent = '实际分辨率: 未开启';
   currentDeviceLabel = '';
   lastQuality = { exposure: 'unknown', brightness: 0 };
@@ -135,6 +252,14 @@ function stopCamera() {
 }
 
 function updateActualResolution() {
+  if (nativePreviewActive) {
+    const width = nativePreview.naturalWidth || 0;
+    const height = nativePreview.naturalHeight || 0;
+    actualResolution.textContent = width && height
+      ? `实际分辨率: ${width} × ${height}（原生取景）`
+      : '实际分辨率: 原生取景读取中';
+    return;
+  }
   if (!activeTrack && !preview.videoWidth) {
     actualResolution.textContent = '实际分辨率: 未开启';
     return;
@@ -436,6 +561,45 @@ function captureDataUrl() {
   };
 }
 
+function nativeCaptureDataUrl() {
+  const width = nativePreview.naturalWidth;
+  const height = nativePreview.naturalHeight;
+  if (!width || !height) {
+    throw new Error('原生取景画面尚未就绪');
+  }
+
+  scratchCanvas.width = width;
+  scratchCanvas.height = height;
+  const context = scratchCanvas.getContext('2d');
+  const adjustments = CaptureEffects.normalizeSoftwareAdjustments(softwareAdjustments);
+  const crop = CaptureEffects.computeZoomCrop({
+    sourceWidth: width,
+    sourceHeight: height,
+    zoom: adjustments.zoom,
+  });
+  context.filter = CaptureEffects.cssFilterForAdjustments(adjustments);
+  context.drawImage(
+    nativePreview,
+    crop.sx,
+    crop.sy,
+    crop.sWidth,
+    crop.sHeight,
+    0,
+    0,
+    width,
+    height
+  );
+  drawAnnotationsOnCapture(context, width, height);
+  context.filter = 'none';
+  return {
+    imageData: scratchCanvas.toDataURL('image/jpeg', 0.92),
+    width,
+    height,
+    softwareAdjustments: adjustments,
+    annotationCount: annotations.length,
+  };
+}
+
 function addRecentCapture(payload, localImageData) {
   const item = document.createElement('li');
   item.className = 'recent-item';
@@ -488,6 +652,142 @@ async function capture() {
   }
 }
 
+async function captureNativeFrame() {
+  if (!nativePreviewActive) {
+    setHint('原生取景未开启。先点击“开启原生取景”，手机对准对象后再拍照。', 'error');
+    return;
+  }
+
+  nativeCaptureButton.disabled = true;
+  setHint(`正在保存 ${currentNativeDeviceLabel || '系统摄像头'} 当前取景画面……`, 'normal');
+
+  try {
+    const frame = nativeCaptureDataUrl();
+    const response = await fetch('/api/captures', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...frame,
+        deviceLabel: currentNativeDeviceLabel,
+        quality: {
+          capture_mode: 'native-avfoundation-preview',
+          software_adjustments: frame.softwareAdjustments,
+          annotation_count: frame.annotationCount,
+          avfoundation_index: Number(systemDeviceSelect.value),
+        },
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || '原生拍照失败');
+    addRecentCapture(payload, frame.imageData);
+    setHint(`已保存原生拍照: ${payload.imagePath}`, 'ok');
+  } catch (error) {
+    setHint(`原生拍照失败: ${error.message}`, 'error');
+  } finally {
+    nativeCaptureButton.disabled = !nativePreviewActive;
+  }
+}
+
+async function refreshNativePreviewFrame() {
+  if (!nativePreviewActive || !nativePreviewSessionId || nativePreviewFrameLoading) return;
+  nativePreviewFrameLoading = true;
+  try {
+    const response = await fetch(
+      `/api/native-preview/frame?sessionId=${encodeURIComponent(nativePreviewSessionId)}&t=${Date.now()}`,
+      { cache: 'no-store' }
+    );
+    if (!response.ok) return;
+    const blob = await response.blob();
+    if (nativePreviewObjectUrl) URL.revokeObjectURL(nativePreviewObjectUrl);
+    nativePreviewObjectUrl = URL.createObjectURL(blob);
+    nativePreview.src = nativePreviewObjectUrl;
+  } catch {
+    // Keep the previous frame visible; the next timer tick will retry.
+  } finally {
+    nativePreviewFrameLoading = false;
+  }
+}
+
+async function startNativePreview() {
+  const deviceIndex = systemDeviceSelect.value;
+  if (!deviceIndex) {
+    setHint('没有可用的系统摄像头。先点击“刷新设备”。', 'error');
+    return;
+  }
+
+  if (stream) stopCamera();
+  const selectedOption = systemDeviceSelect.selectedOptions[0];
+  currentNativeDeviceLabel = selectedOption?.dataset.label || selectedOption?.textContent || `AVFoundation Camera ${deviceIndex}`;
+  startNativePreviewButton.disabled = true;
+  setHint(`正在开启原生取景: ${currentNativeDeviceLabel}……`, 'normal');
+
+  try {
+    const response = await fetch('/api/native-preview/start', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        deviceIndex: Number(deviceIndex),
+        deviceLabel: currentNativeDeviceLabel,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || '原生取景启动失败');
+
+    nativePreviewSessionId = payload.sessionId;
+    nativePreviewActive = true;
+    preview.hidden = true;
+    nativePreview.hidden = false;
+    standbyOverlay.hidden = true;
+    startCameraButton.disabled = false;
+    stopCameraButton.disabled = true;
+    captureButton.disabled = true;
+    stopNativePreviewButton.disabled = false;
+    nativeCaptureButton.disabled = false;
+    actualResolution.textContent = '实际分辨率: 原生取景读取中';
+    nativePreviewRefreshTimer = setInterval(refreshNativePreviewFrame, 200);
+    refreshNativePreviewFrame();
+    setHint(`已开启原生取景: ${currentNativeDeviceLabel}。手机对准对象后点击“原生拍照”。`, 'ok');
+  } catch (error) {
+    nativePreviewActive = false;
+    nativePreviewSessionId = '';
+    startNativePreviewButton.disabled = systemDeviceSelect.value === '';
+    stopNativePreviewButton.disabled = true;
+    nativeCaptureButton.disabled = true;
+    setHint(`原生取景启动失败: ${error.message}`, 'error');
+  }
+}
+
+function stopNativePreview() {
+  const sessionId = nativePreviewSessionId;
+  nativePreviewActive = false;
+  nativePreviewSessionId = '';
+  if (nativePreviewRefreshTimer) {
+    clearInterval(nativePreviewRefreshTimer);
+    nativePreviewRefreshTimer = null;
+  }
+  if (nativePreviewObjectUrl) {
+    URL.revokeObjectURL(nativePreviewObjectUrl);
+    nativePreviewObjectUrl = '';
+  }
+  nativePreview.removeAttribute('src');
+  nativePreview.hidden = true;
+  preview.hidden = false;
+  currentNativeDeviceLabel = '';
+  actualResolution.textContent = '实际分辨率: 未开启';
+  startNativePreviewButton.disabled = systemDeviceSelect.value === '';
+  stopNativePreviewButton.disabled = true;
+  nativeCaptureButton.disabled = true;
+  if (!stream) standbyOverlay.hidden = false;
+  if (sessionId) {
+    fetch('/api/native-preview/stop', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
+    }).catch(() => {});
+  }
+  setHint('原生取景已关闭。', 'normal');
+}
+
 async function startSelectedCamera() {
   if (!navigator.mediaDevices?.getUserMedia) {
     setHint('当前浏览器不支持摄像头 API。', 'error');
@@ -496,7 +796,7 @@ async function startSelectedCamera() {
   try {
     startCameraButton.disabled = true;
     setHint('正在开启摄像头……', 'normal');
-    await enumerateVideoDevices();
+    await refreshDeviceInventory();
     const selected = deviceSelect.value || preferredDeviceId();
     await startCamera(selected);
     const preferred = preferredDeviceId();
@@ -525,6 +825,14 @@ deviceSelect.addEventListener('change', () => {
 startCameraButton.addEventListener('click', startSelectedCamera);
 stopCameraButton.addEventListener('click', stopCamera);
 captureButton.addEventListener('click', capture);
+startNativePreviewButton.addEventListener('click', startNativePreview);
+stopNativePreviewButton.addEventListener('click', stopNativePreview);
+nativeCaptureButton.addEventListener('click', captureNativeFrame);
+systemDeviceSelect.addEventListener('change', () => {
+  if (!nativePreviewActive) return;
+  stopNativePreview();
+  setHint('已切换系统摄像头。点击“开启原生取景”后生效。', 'normal');
+});
 resolutionMode.addEventListener('change', () => {
   if (!stream) return;
   startCamera(deviceSelect.value).catch((error) => {
@@ -585,8 +893,13 @@ openFolderButton.addEventListener('click', async () => {
 
 refreshDevicesButton.addEventListener('click', async () => {
   try {
-    const found = await enumerateVideoDevices();
-    setHint(`已刷新摄像头列表，发现 ${found.length} 个视频设备。`, 'ok');
+    if (stream) stopCamera();
+    if (nativePreviewActive) stopNativePreview();
+    const found = await refreshDeviceInventory();
+    setHint(
+      `已刷新摄像头列表：浏览器 ${found.browserDevices.length} 个，系统 ${found.systemDevices.length} 个。`,
+      'ok'
+    );
   } catch (error) {
     setHint(`刷新设备失败: ${error.message}`, 'error');
   }
@@ -594,10 +907,11 @@ refreshDevicesButton.addEventListener('click', async () => {
 
 preview.addEventListener('loadedmetadata', refreshQualityHint);
 preview.addEventListener('loadedmetadata', updateActualResolution);
+nativePreview.addEventListener('load', updateActualResolution);
 window.addEventListener('resize', resizeAnnotationCanvas);
 setInterval(refreshQualityHint, 1500);
 
-enumerateVideoDevices().catch(() => {
+refreshDeviceInventory().catch(() => {
   setHint('点击“开启摄像头”后，浏览器会请求权限并显示可用设备。', 'normal');
 });
 renderSoftwareControls();

@@ -35,7 +35,9 @@ function formatShanghaiIso(date) {
 }
 
 function sourceSlug(deviceLabel) {
-  return /usb\s*camera/i.test(deviceLabel || '') ? 'usb-camera' : 'camera';
+  if (/usb\s*camera/i.test(deviceLabel || '')) return 'usb-camera';
+  if (/iphone/i.test(deviceLabel || '')) return 'iphone-camera';
+  return 'camera';
 }
 
 function extensionFromMime(mimeType) {

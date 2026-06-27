@@ -139,11 +139,20 @@ button:disabled {
   overflow: hidden;
 }
 
-video {
+.preview-wrap > video,
+.preview-wrap > .native-preview {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  z-index: 1;
+}
+
+video[hidden],
+.native-preview[hidden] {
+  display: none !important;
 }
 
 #annotationCanvas {
@@ -319,6 +328,58 @@ video {
   display: grid;
   gap: 12px;
   margin-top: 12px;
+}
+
+.device-diagnostics {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  color: #4d3c2e;
+  font-size: 12px;
+}
+
+.device-diagnostics strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.device-diagnostics ul {
+  display: grid;
+  gap: 4px;
+  min-height: 30px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #eadcca;
+  border-radius: 10px;
+  background: #fffaf3;
+  list-style: none;
+}
+
+.device-diagnostics li[data-missing="true"] {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.native-capture {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.native-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.native-actions button {
+  min-height: 38px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.native-actions #nativeCaptureButton {
+  grid-column: 1 / -1;
 }
 
 .control-row {

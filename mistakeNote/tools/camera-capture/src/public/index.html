@@ -38,10 +38,11 @@
         <div class="preview-card">
           <div class="preview-wrap">
             <video id="preview" autoplay playsinline muted></video>
+            <img id="nativePreview" class="native-preview" alt="系统摄像头原生取景画面" hidden />
             <canvas id="annotationCanvas" aria-label="画面标注层"></canvas>
             <div id="standbyOverlay" class="standby-overlay">
               <strong>摄像头未开启</strong>
-              <span>点击“开启摄像头”后再拍题。</span>
+              <span>点击“开启摄像头”或“开启原生取景”后再拍题。</span>
             </div>
             <div class="a4-guide">
               <span>把试卷四角放进这个框</span>
@@ -66,6 +67,29 @@
             <h2>摄像头调节</h2>
             <p id="controlsHint">开启摄像头后显示当前设备支持的控制项。</p>
             <div id="controlsList" class="controls-list"></div>
+            <h3>设备诊断</h3>
+            <p class="controls-note">如果这里系统可见 iPhone，但上方下拉框没有，说明是浏览器没有暴露该摄像头。</p>
+            <div class="device-diagnostics">
+              <div>
+                <strong>浏览器可见</strong>
+                <ul id="browserDevicesList"></ul>
+              </div>
+              <div>
+                <strong>macOS/ffmpeg 可见</strong>
+                <ul id="systemDevicesList"></ul>
+              </div>
+            </div>
+            <div class="native-capture">
+              <label class="control-row">
+                <span>系统摄像头原生取景</span>
+                <select id="systemDeviceSelect"></select>
+              </label>
+              <div class="native-actions">
+                <button id="startNativePreviewButton" type="button" disabled>开启原生取景</button>
+                <button id="stopNativePreviewButton" type="button" disabled>关闭原生取景</button>
+                <button id="nativeCaptureButton" type="button" disabled>原生拍照</button>
+              </div>
+            </div>
             <h3>红色标注工具</h3>
             <div id="annotationToolbar" class="annotation-toolbar" aria-label="红色标注工具栏">
               <button type="button" data-tool="rect" class="active">矩形</button>
