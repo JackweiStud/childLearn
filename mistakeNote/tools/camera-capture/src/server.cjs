@@ -118,6 +118,24 @@ function handleOpenScans(res) {
   sendJson(res, 200, { opened: store.scansRoot });
 }
 
+async function handleOpenFile(req, res) {
+  try {
+    const body = JSON.parse(await readRequestBody(req, 1024 * 1024));
+    const filePath = safeJoin(repoRoot, body.filePath);
+    if (!filePath || !fs.existsSync(filePath)) {
+      sendError(res, 404, 'File not found or invalid path');
+      return;
+    }
+    childProcess.spawn('open', [filePath], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+    sendJson(res, 200, { opened: filePath });
+  } catch (error) {
+    sendError(res, 400, error.message);
+  }
+}
+
 function parseAvfoundationVideoDevices(output) {
   const devices = [];
   let insideVideoSection = false;
@@ -475,6 +493,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/open-scans') {
     handleOpenScans(res);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/open-file') {
+    handleOpenFile(req, res);
     return;
   }
 

@@ -1,0 +1,366 @@
+// annotation-handler.js - 管理画布标注、画笔颜色、撤销、擦除与区域截图功能
+(function exposeAnnotationHandler(root) {
+  // 标注状态管理
+  const state = {
+    currentTool: 'rect',     // rect, circle, pen, eraser, crop
+    currentColor: '#ff1f1f',  // 默认红笔
+    shapes: [],              // 存储所有已画好的标注图形
+    activeShape: null,       // 正在画的图形 (指针未抬起)
+    cropBox: null,           // 裁剪截图区域（归一化坐标：{start: {x,y}, end: {x,y}}）
+    eraserWidth: 0.03        // 橡皮擦宽度（归一化百分比）
+  };
+
+  // 初始化标注模块
+  function init() {
+    const canvas = UI.elements.annotationCanvas;
+    if (!canvas) return;
+
+    // 绑定工具栏切换事件
+    if (UI.elements.annotationToolbar) {
+      UI.elements.annotationToolbar.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-tool]');
+        if (!btn) return;
+        
+        state.currentTool = btn.dataset.tool;
+        
+        // 激活状态样式切换
+        UI.elements.annotationToolbar.querySelectorAll('button[data-tool]').forEach(b => {
+          b.classList.toggle('active', b === btn);
+        });
+
+        UI.log(`切换到工具: ${state.currentTool}`);
+      });
+    }
+
+    // 绑定预设颜色圆点点击事件
+    if (UI.elements.colorPicker) {
+      UI.elements.colorPicker.addEventListener('click', (e) => {
+        const dot = e.target.closest('button[data-color]');
+        if (!dot) return;
+
+        state.currentColor = dot.dataset.color;
+
+        // 同步自定义颜色 input 的值
+        const customInput = document.getElementById('customColorInput');
+        if (customInput) customInput.value = state.currentColor;
+
+        // 激活状态样式切换
+        UI.elements.colorPicker.querySelectorAll('.color-dot').forEach(d => {
+          d.classList.toggle('active', d === dot);
+        });
+
+        UI.log(`切换画笔颜色: ${state.currentColor}`);
+      });
+    }
+
+    // 绑定自定义颜色选择器（<input type="color">）
+    const customColorInput = document.getElementById('customColorInput');
+    if (customColorInput) {
+      customColorInput.addEventListener('input', () => {
+        state.currentColor = customColorInput.value;
+        // 取消所有预设圆点的激活状态
+        if (UI.elements.colorPicker) {
+          UI.elements.colorPicker.querySelectorAll('button[data-color]').forEach(d => {
+            d.classList.remove('active');
+          });
+        }
+        UI.log(`切换到自定义颜色: ${state.currentColor}`);
+      });
+    }
+
+    // 撤销上一步
+    if (UI.elements.undoButton) {
+      UI.elements.undoButton.addEventListener('click', () => {
+        if (state.shapes.length > 0) {
+          state.shapes.pop();
+          render();
+          UI.log('已撤销上一个标注');
+        } else if (state.cropBox) {
+          state.cropBox = null;
+          render();
+          UI.log('已清除截图区域');
+        }
+      });
+    }
+
+    // 清空全部
+    if (UI.elements.clearAnnotationsButton) {
+      UI.elements.clearAnnotationsButton.addEventListener('click', () => {
+        state.shapes = [];
+        state.activeShape = null;
+        state.cropBox = null;
+        render();
+        UI.log('清空所有标注与截图框');
+      });
+    }
+
+    // 画布指针事件绑定
+    canvas.addEventListener('pointerdown', handlePointerDown);
+    canvas.addEventListener('pointermove', handlePointerMove);
+    canvas.addEventListener('pointerup', handlePointerUp);
+    canvas.addEventListener('pointercancel', handlePointerCancel);
+
+    // 窗口缩放自适应
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+  }
+
+  // 重置画布分辨率
+  function resizeCanvas() {
+    const canvas = UI.elements.annotationCanvas;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    
+    const width = Math.max(1, Math.round(rect.width * ratio));
+    const height = Math.max(1, Math.round(rect.height * ratio));
+    
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    render();
+  }
+
+  // 坐标归一化转换
+  function getNormalizedPoint(event) {
+    const canvas = UI.elements.annotationCanvas;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) / rect.width,
+      y: (event.clientY - rect.top) / rect.height
+    };
+  }
+
+  // 指针按下开始绘制
+  function handlePointerDown(e) {
+    const canvas = UI.elements.annotationCanvas;
+    canvas.setPointerCapture(e.pointerId);
+    
+    const pt = getNormalizedPoint(e);
+
+    if (state.currentTool === 'crop') {
+      state.cropBox = { start: pt, end: pt };
+    } else if (state.currentTool === 'eraser') {
+      state.activeShape = {
+        type: 'eraser',
+        points: [pt]
+      };
+    } else if (state.currentTool === 'pen') {
+      state.activeShape = {
+        type: 'pen',
+        color: state.currentColor,
+        points: [pt]
+      };
+    } else {
+      // 矩形 / 圆形
+      state.activeShape = {
+        type: state.currentTool,
+        color: state.currentColor,
+        start: pt,
+        end: pt
+      };
+    }
+    render();
+  }
+
+  // 指针移动中
+  function handlePointerMove(e) {
+    if (state.currentTool === 'crop') {
+      if (state.cropBox) {
+        state.cropBox.end = getNormalizedPoint(e);
+        render();
+      }
+      return;
+    }
+
+    if (!state.activeShape) return;
+    const pt = getNormalizedPoint(e);
+
+    if (state.activeShape.type === 'pen' || state.activeShape.type === 'eraser') {
+      state.activeShape.points.push(pt);
+    } else {
+      state.activeShape.end = pt;
+    }
+    render();
+  }
+
+  // 指针抬起完成
+  function handlePointerUp() {
+    if (state.currentTool === 'crop') {
+      // 截图区域结束
+      if (state.cropBox) {
+        // 防止点按产生极小区域，做极小范围过滤
+        const dx = Math.abs(state.cropBox.end.x - state.cropBox.start.x);
+        const dy = Math.abs(state.cropBox.end.y - state.cropBox.start.y);
+        if (dx < 0.01 || dy < 0.01) {
+          state.cropBox = null;
+          UI.log('选择区域过小，已取消截图框');
+        } else {
+          // 选区有效，先渲染截图框再自动触发保存
+          render();
+          UI.log('截图选区已确认，正在自动保存选区截图...');
+          if (window.CameraHandler) {
+            window.CameraHandler.capture();
+          }
+          return;
+        }
+      }
+      render();
+      return;
+    }
+
+    if (!state.activeShape) return;
+    state.shapes.push(state.activeShape);
+    state.activeShape = null;
+    render();
+  }
+
+  // 取消操作
+  function handlePointerCancel() {
+    state.activeShape = null;
+    render();
+  }
+
+  // 画具体形状
+  function drawShape(ctx, shape, w, h) {
+    ctx.save();
+    
+    // 如果是橡皮擦，采用 destination-out 清理
+    if (shape.type === 'eraser') {
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+      ctx.lineWidth = Math.max(12, Math.round(w * state.eraserWidth));
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalCompositeOperation = 'destination-out';
+      
+      if (shape.points.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(shape.points[0].x * w, shape.points[0].y * h);
+        for (const pt of shape.points.slice(1)) {
+          ctx.lineTo(pt.x * w, pt.y * h);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+
+    ctx.strokeStyle = shape.color || '#ff1f1f';
+    ctx.lineWidth = Math.max(3, Math.round(w * 0.0035));
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (shape.type === 'rect' || shape.type === 'circle') {
+      const x1 = shape.start.x * w;
+      const y1 = shape.start.y * h;
+      const x2 = shape.end.x * w;
+      const y2 = shape.end.y * h;
+      
+      const left = Math.min(x1, x2);
+      const top = Math.min(y1, y2);
+      const width = Math.abs(x2 - x1);
+      const height = Math.abs(y2 - y1);
+
+      if (shape.type === 'rect') {
+        ctx.strokeRect(left, top, width, height);
+      } else {
+        ctx.beginPath();
+        ctx.ellipse(
+          left + width / 2,
+          top + height / 2,
+          width / 2,
+          height / 2,
+          0, 0, Math.PI * 2
+        );
+        ctx.stroke();
+      }
+    } else if (shape.type === 'pen' && shape.points.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(shape.points[0].x * w, shape.points[0].y * h);
+      for (const pt of shape.points.slice(1)) {
+        ctx.lineTo(pt.x * w, pt.y * h);
+      }
+      ctx.stroke();
+    }
+    
+    ctx.restore();
+  }
+
+  // 渲染函数
+  function render() {
+    const canvas = UI.elements.annotationCanvas;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // 清屏
+    ctx.clearRect(0, 0, w, h);
+
+    // 绘制所有固定形状
+    for (const shape of state.shapes) {
+      drawShape(ctx, shape, w, h);
+    }
+
+    // 绘制当前正在画的临时图形
+    if (state.activeShape) {
+      drawShape(ctx, state.activeShape, w, h);
+    }
+
+    // 绘制截图裁剪选区
+    if (state.cropBox) {
+      ctx.save();
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      
+      const x1 = state.cropBox.start.x * w;
+      const y1 = state.cropBox.start.y * h;
+      const x2 = state.cropBox.end.x * w;
+      const y2 = state.cropBox.end.y * h;
+      
+      const left = Math.min(x1, x2);
+      const top = Math.min(y1, y2);
+      const width = Math.abs(x2 - x1);
+      const height = Math.abs(y2 - y1);
+
+      ctx.strokeRect(left, top, width, height);
+      
+      // 遮罩效果
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      // 绘制上下左右四个遮罩矩形
+      ctx.fillRect(0, 0, w, top); // 上
+      ctx.fillRect(0, top + height, w, h - (top + height)); // 下
+      ctx.fillRect(0, top, left, height); // 左
+      ctx.fillRect(left + width, top, w - (left + width), height); // 右
+      
+      ctx.restore();
+    }
+  }
+
+  // 在保存图片时将所有标注单独绘制到一个离屏画布上以防止 destination-out 擦除底图
+  function drawOnCapture(targetCtx, w, h) {
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const offCtx = offscreen.getContext('2d');
+
+    // 把当前已有的形状画在离屏画布上
+    for (const shape of state.shapes) {
+      drawShape(offCtx, shape, w, h);
+    }
+
+    // 把这个透明离屏画布绘制到目标 JPG 画布上
+    targetCtx.drawImage(offscreen, 0, 0);
+  }
+
+  // 暴露 API
+  root.AnnotationHandler = {
+    init,
+    state,
+    render,
+    resizeCanvas,
+    drawOnCapture
+  };
+})(window);
