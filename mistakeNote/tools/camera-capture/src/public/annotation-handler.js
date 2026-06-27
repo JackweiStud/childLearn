@@ -99,14 +99,28 @@
     const canvas = UI.elements.annotationCanvas;
     if (!canvas) return;
 
-    // 绑定工具栏切换事件
+    // 绑定工具栏切换事件（再次点击已激活工具则取消选中）
     if (UI.elements.annotationToolbar) {
       UI.elements.annotationToolbar.addEventListener('click', (e) => {
         const btn = e.target.closest('button[data-tool]');
         if (!btn) return;
-        
-        state.currentTool = btn.dataset.tool;
-        
+
+        const clickedTool = btn.dataset.tool;
+        // 再次点击同一工具 → 取消选中
+        if (clickedTool === state.currentTool) {
+          state.currentTool = null;
+          UI.elements.annotationToolbar.querySelectorAll('button[data-tool]').forEach(b => b.classList.remove('active'));
+          hideCropToolbar();
+          cancelTextEdit();
+          const textBar = document.getElementById('textOptionsBar');
+          if (textBar) textBar.hidden = true;
+          canvas.style.cursor = '';
+          UI.log('工具已取消');
+          return;
+        }
+
+        state.currentTool = clickedTool;
+
         // 激活状态样式切换
         UI.elements.annotationToolbar.querySelectorAll('button[data-tool]').forEach(b => {
           b.classList.toggle('active', b === btn);
@@ -307,7 +321,10 @@
   function handlePointerDown(e) {
     const canvas = UI.elements.annotationCanvas;
     canvas.setPointerCapture(e.pointerId);
-    
+
+    // 无工具选中时不响应画布操作
+    if (!state.currentTool) return;
+
     const pt = getNormalizedPoint(e);
 
     // 文字工具：在点击位置弹出内联编辑器
