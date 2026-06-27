@@ -108,6 +108,18 @@
       });
     }
 
+    // 画面旋转
+    if (UI.elements.rotate90Button) {
+      UI.elements.rotate90Button.addEventListener('click', () => {
+        if (window.CameraHandler) window.CameraHandler.rotate90();
+      });
+    }
+    if (UI.elements.resetRotationButton) {
+      UI.elements.resetRotationButton.addEventListener('click', () => {
+        if (window.CameraHandler) window.CameraHandler.resetRotation();
+      });
+    }
+
     // 键盘快捷键：⌘S 拍照、⌘Z 撤销、ESC 清空标注
     document.addEventListener('keydown', (e) => {
       // 焦点在输入框时不拦截

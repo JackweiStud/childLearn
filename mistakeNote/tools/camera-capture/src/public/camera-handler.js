@@ -12,6 +12,7 @@
     nativeRefreshTimer: null,
     nativeObjectUrl: '',
     
+    rotationDeg: 0,             // 画面旋转角度: 0 / 90 / 180 / 270
     // 缓存最新帧质量评估数据
     lastQuality: { exposure: 'unknown', brightness: 0 }
   };
@@ -140,6 +141,22 @@
     } catch (err) {
       UI.setStatus(`设备检测异常: ${err.message}`, 'error');
     }
+  }
+
+  // 顺时针旋转画面 90°，同步 CSS transform 到 video/img 和 annotation canvas
+  function rotate90() {
+    state.rotationDeg = (state.rotationDeg + 90) % 360;
+    applySoftwareFiltersToPreview();
+    if (window.AnnotationHandler) window.AnnotationHandler.resizeCanvas();
+    UI.log(`画面已旋转至 ${state.rotationDeg}°`);
+  }
+
+  // 重置旋转至 0°
+  function resetRotation() {
+    state.rotationDeg = 0;
+    applySoftwareFiltersToPreview();
+    if (window.AnnotationHandler) window.AnnotationHandler.resizeCanvas();
+    UI.log('画面旋转已重置为 0°');
   }
 
   // 根据当前下拉选中设备类型，更新分辨率选择器的启用/禁用状态
@@ -621,17 +638,25 @@
     applySoftwareFiltersToPreview();
   }
 
-  // 应用软件 CSS filter/transform 滤镜于画面预览上
+  // 应用软件 CSS filter/transform 滤镜于画面预览上，同步旋转到标注画布
   function applySoftwareFiltersToPreview() {
     const filters = CaptureEffects.cssFilterForAdjustments(softwareAdjustments);
     const scale = softwareAdjustments.zoom;
+    const rotStr = state.rotationDeg !== 0 ? ` rotate(${state.rotationDeg}deg)` : '';
 
     const targetPreview = (state.currentDeviceType === 'native') ? UI.elements.nativePreview : UI.elements.preview;
-    
-    // 应用效果
+
+    // 应用效果到预览画面
     targetPreview.style.filter = filters;
-    targetPreview.style.transform = `scale(${scale})`;
+    targetPreview.style.transform = `scale(${scale})${rotStr}`;
     targetPreview.style.transformOrigin = 'center center';
+
+    // 标注画布同步旋转，保持视觉对齐
+    const canvas = UI.elements.annotationCanvas;
+    if (canvas) {
+      canvas.style.transform = rotStr.trim() || '';
+      canvas.style.transformOrigin = 'center center';
+    }
   }
 
   // 拍摄当前画面生成大图数据
@@ -728,6 +753,27 @@
       }
     }
 
+    // 如有旋转，将最终合成图旋转后输出
+    if (state.rotationDeg !== 0) {
+      const rad = (state.rotationDeg * Math.PI) / 180;
+      const isSwapped = state.rotationDeg === 90 || state.rotationDeg === 270;
+      const rotCanvas = document.createElement('canvas');
+      const rotCtx = rotCanvas.getContext('2d');
+      rotCanvas.width = isSwapped ? targetHeight : targetWidth;
+      rotCanvas.height = isSwapped ? targetWidth : targetHeight;
+      rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+      rotCtx.rotate(rad);
+      rotCtx.drawImage(canvas, -targetWidth / 2, -targetHeight / 2, targetWidth, targetHeight);
+      return {
+        imageData: rotCanvas.toDataURL('image/jpeg', 0.92),
+        width: rotCanvas.width,
+        height: rotCanvas.height,
+        softwareAdjustments: adj,
+        annotationCount: window.AnnotationHandler ? window.AnnotationHandler.state.shapes.length : 0,
+        isCropped: !!hasCropBox
+      };
+    }
+
     return {
       imageData: canvas.toDataURL('image/jpeg', 0.92),
       width: targetWidth,
@@ -821,6 +867,8 @@
     stop,
     capture,
     checkQualityLoop,
-    updateResolutionSelectState
+    updateResolutionSelectState,
+    rotate90,
+    resetRotation
   };
 })(window);

@@ -5,12 +5,14 @@
     currentTool: 'rect',     // rect, circle, pen, eraser, crop
     currentColor: '#ff1f1f',  // 默认红笔
     shapes: [],              // 存储所有已画好的标注图形
+    undoHistory: [],         // 撤销快照栈，每步保存 shapes 的浅拷贝，最多 10 步
     activeShape: null,       // 正在画的图形 (指针未抬起)
     cropBox: null,           // 裁剪截图区域（归一化坐标：{start: {x,y}, end: {x,y}}）
     eraserWidth: 0.03,       // 橡皮擦宽度（归一化百分比）
     dragHandle: null,        // 当前正在拖拽的控制点或移动标志
     dragStartPoint: null,    // 拖拽起始点归一化坐标
-    dragStartBox: null       // 拖拽起始时裁剪框的归一化范围
+    dragStartBox: null,      // 拖拽起始时裁剪框的归一化范围
+    isDrawingCrop: false     // 是否正在从头开始拖拽绘制一个新的截图框
   };
 
   // 显示截图悬浮操作栏
@@ -118,26 +120,29 @@
       });
     }
 
-    // 撤销上一步
+    // 撤销上一步（从 history 栈弹出上一个快照）
     if (UI.elements.undoButton) {
       UI.elements.undoButton.addEventListener('click', () => {
-        if (state.shapes.length > 0) {
-          state.shapes.pop();
+        if (state.undoHistory.length > 0) {
+          state.shapes = state.undoHistory.pop();
           render();
-          UI.log('已撤销上一个标注');
+          UI.log(`已撤销，剩余可撤销步数: ${state.undoHistory.length}`);
         } else if (state.cropBox) {
           state.cropBox = null;
           hideCropToolbar();
           render();
           UI.log('已清除截图区域');
+        } else {
+          UI.log('没有可撤销的操作');
         }
       });
     }
 
-    // 清空全部
+    // 清空全部（同时清除历史）
     if (UI.elements.clearAnnotationsButton) {
       UI.elements.clearAnnotationsButton.addEventListener('click', () => {
         state.shapes = [];
+        state.undoHistory = [];
         state.activeShape = null;
         state.cropBox = null;
         hideCropToolbar();
@@ -192,14 +197,19 @@
     render();
   }
 
-  // 坐标归一化转换
+  // 坐标归一化转换（当画布有 CSS 旋转时，将视觉坐标逆变换回逻辑坐标）
   function getNormalizedPoint(event) {
     const canvas = UI.elements.annotationCanvas;
     const rect = canvas.getBoundingClientRect();
-    return {
-      x: (event.clientX - rect.left) / rect.width,
-      y: (event.clientY - rect.top) / rect.height
-    };
+    let vx = (event.clientX - rect.left) / rect.width;
+    let vy = (event.clientY - rect.top) / rect.height;
+
+    const rot = (window.CameraHandler && window.CameraHandler.state.rotationDeg) || 0;
+    if (rot === 90)       { const t = vx; vx = 1 - vy; vy = t; }
+    else if (rot === 180) { vx = 1 - vx; vy = 1 - vy; }
+    else if (rot === 270) { const t = vx; vx = vy; vy = 1 - t; }
+
+    return { x: vx, y: vy };
   }
 
   // 指针按下开始绘制
@@ -275,6 +285,7 @@
 
       // 如果点在其他位置，则开始绘制一个新的截图框
       hideCropToolbar();
+      state.isDrawingCrop = true;
       state.cropBox = { start: pt, end: pt };
     } else if (state.currentTool === 'eraser') {
       state.activeShape = {
@@ -362,7 +373,7 @@
           end: { x: newX2, y: newY2 }
         };
         render();
-      } else if (state.cropBox) {
+      } else if (state.isDrawingCrop && state.cropBox) {
         state.cropBox.end = getNormalizedPoint(e);
         render();
       }
@@ -381,7 +392,12 @@
   }
 
   // 指针抬起完成
-  function handlePointerUp() {
+  function handlePointerUp(e) {
+    const canvas = UI.elements.annotationCanvas;
+    try {
+      canvas.releasePointerCapture(e.pointerId);
+    } catch (err) {}
+
     if (state.currentTool === 'crop') {
       if (state.dragHandle) {
         state.dragHandle = null;
@@ -391,19 +407,22 @@
         return;
       }
       
-      // 截图区域结束
-      if (state.cropBox) {
-        // 防止点按产生极小区域，做极小范围过滤
-        const dx = Math.abs(state.cropBox.end.x - state.cropBox.start.x);
-        const dy = Math.abs(state.cropBox.end.y - state.cropBox.start.y);
-        if (dx < 0.01 || dy < 0.01) {
-          state.cropBox = null;
-          UI.log('选择区域过小，已取消截图框');
-          hideCropToolbar();
-        } else {
-          // 选区有效，渲染截图框并显示悬浮操作栏
-          render();
-          showCropToolbar();
+      if (state.isDrawingCrop) {
+        state.isDrawingCrop = false;
+        // 截图区域结束
+        if (state.cropBox) {
+          // 防止点按产生极小区域，做极小范围过滤
+          const dx = Math.abs(state.cropBox.end.x - state.cropBox.start.x);
+          const dy = Math.abs(state.cropBox.end.y - state.cropBox.start.y);
+          if (dx < 0.01 || dy < 0.01) {
+            state.cropBox = null;
+            UI.log('选择区域过小，已取消截图框');
+            hideCropToolbar();
+          } else {
+            // 选区有效，渲染截图框并显示悬浮操作栏
+            render();
+            showCropToolbar();
+          }
         }
       }
       render();
@@ -411,6 +430,9 @@
     }
 
     if (!state.activeShape) return;
+    // 完成一笔前先保存快照到历史栈，最多保留 10 步
+    state.undoHistory.push([...state.shapes]);
+    if (state.undoHistory.length > 10) state.undoHistory.shift();
     state.shapes.push(state.activeShape);
     state.activeShape = null;
     render();
@@ -419,6 +441,7 @@
   // 取消操作
   function handlePointerCancel() {
     state.activeShape = null;
+    state.isDrawingCrop = false;
     render();
   }
 

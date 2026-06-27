@@ -43,6 +43,8 @@
     cropActionToolbar: document.getElementById('cropActionToolbar'),
     cropConfirmButton: document.getElementById('cropConfirmButton'),
     cropCancelButton: document.getElementById('cropCancelButton'),
+    rotate90Button: document.getElementById('rotate90Button'),
+    resetRotationButton: document.getElementById('resetRotationButton'),
   };
 
   // 控制台日志功能
