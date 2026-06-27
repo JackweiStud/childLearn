@@ -38,20 +38,21 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden; /* 页面级不滚动，所有内容压进视口 */
   display: flex;
   justify-content: center;
-  overflow-x: hidden;
 }
 
 .app-container {
   width: 100%;
   max-width: 1600px;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   padding: 16px;
-  padding-bottom: 72px; /* 给固定底栏留出空间（header 40px + gap 16px + 余量 16px） */
+  padding-bottom: 72px; /* 给固定底栏留出空间 */
   gap: 14px;
 }
 
@@ -106,18 +107,19 @@ body {
   min-height: 0;
 }
 
-/* ===== 主画板（卡片样式 + 16:9 + 容纳所有悬浮栏） ===== */
+/* ===== 主画板（撑满剩余高度，video 内部 object-fit: contain 保宽高比） ===== */
 .center-workspace {
   display: flex;
   flex-direction: column;
-  align-self: start;
   width: 100%;
+  min-height: 0;
 }
 
 .preview-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  flex: 1 1 0; /* 占满 center-workspace 中 control-bar 之外的全部高度 */
+  min-height: 480px;
   background: #191613;
   border-radius: var(--border-radius-lg);
   border: 1px solid var(--border-color);
@@ -126,7 +128,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 480px;
 }
 
 .preview-wrap video,
