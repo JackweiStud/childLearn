@@ -125,4 +125,22 @@ test('拍照台支持错题元数据预设、多态 A4 辅助线切换、快门�
   assert.match(recentJs, /delete-btn/);
   assert.match(recentJs, /method:\s*'DELETE'/);
   assert.match(stylesCss, /\.delete-btn/);
+
+  // 重构：全屏按钮与绝对悬浮工具栏
+  assert.match(indexHtml, /id="fullscreenToggleBtn"/);
+  assert.match(indexHtml, /id="toolbarToggleBtn"/);
+  assert.match(uiJs, /fullscreenToggleBtn:\s*document\.getElementById/);
+  assert.match(uiJs, /toolbarToggleBtn:\s*document\.getElementById/);
+  assert.match(appJs, /fullscreenToggleBtn\.addEventListener\('click'/);
+  assert.match(appJs, /toolbarToggleBtn\.addEventListener\('click'/);
+  assert.match(stylesCss, /\.left-toolbar\s*\{\s*position:\s*absolute/);
+  assert.match(stylesCss, /\.preview-wrap:fullscreen/);
+
+  // 重构：面板折叠
+  assert.match(indexHtml, /id="cameraControlsToggle"/);
+  assert.match(indexHtml, /id="recentCapturesToggle"/);
+  assert.match(appJs, /cameraControlsToggle\.addEventListener\('click'/);
+  assert.match(appJs, /recentCapturesToggle\.addEventListener\('click'/);
+  assert.match(stylesCss, /\.collapsible-body\.collapsed/);
+  assert.match(stylesCss, /\.panel-body-content\.collapsed/);
 });

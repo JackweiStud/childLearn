@@ -1,304 +1,342 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>错题拍照台</title>
-    <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <div id="toastContainer" class="toast-container"></div>
-    <div class="app-container">
-      <header class="app-header">
-        <div class="logo-area">
-          <span class="eyebrow">mistakeNote</span>
-          <h1>错题拍照台</h1>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>错题拍照台</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="eyebrow">mistakeNote</span>
+        <h1>错题拍照台</h1>
+      </div>
+      <p class="subtitle">USB 取景 · 红框标注 · 区域裁切 · 自动归档</p>
+    </header>
+
+    <div class="main-layout">
+      <!-- 主区域：视频画板 + 左右悬浮栏 + 顶部控制条 -->
+      <main class="center-workspace">
+
+        <!-- 独立顶部控制栏（不悬浮在画板上） -->
+        <div class="preview-actions">
+          <div class="status-indicator">
+            <span id="qualityHint" class="status-text">未检测到活动摄像头</span>
+            <span id="actualResolution" class="res-text">实际分辨率: --</span>
+          </div>
+          <div class="primary-controls">
+            <button id="startCameraButton" type="button" class="control-btn accent-btn">开启摄像头</button>
+            <button id="stopCameraButton" type="button" class="control-btn" disabled>关闭摄像头</button>
+            <button id="captureButton" type="button" class="control-btn primary-btn" disabled title="拍照保存 (⌘S)">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7.5" r="3" stroke="currentColor" stroke-width="1.4" />
+                <path d="M1 4.5H2.5L4 2.5H10L11.5 4.5H13V12H1V4.5Z" stroke="currentColor" stroke-width="1.4"
+                  stroke-linejoin="round" />
+              </svg>
+              拍照保存
+            </button>
+            <button id="refreshDevicesButton" type="button" class="control-btn">刷新设备</button>
+            <button id="openFolderButton" type="button" class="control-btn">打开目录</button>
+          </div>
         </div>
-        <p class="subtitle">本地高质错题试卷拍摄采集，支持红框标注与快速校准</p>
-      </header>
 
-      <div class="main-layout">
-        <!-- 1. 左侧竖向标注工具栏 -->
-        <aside class="left-toolbar" aria-label="标注工具栏">
-          <div class="toolbar-section">
-            <h3>标注工具</h3>
-            <div id="annotationToolbar" class="vertical-buttons">
+        <div class="preview-wrap" id="previewWrap">
 
-              <button type="button" data-tool="rect" class="active" title="矩形标注">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <rect x="2.5" y="2.5" width="13" height="13" rx="1.5" stroke="currentColor" stroke-width="1.8"/>
-                </svg>
-                <span>矩形</span>
-              </button>
+          <!-- 折叠手把：贴画板左边缘，独立于左栏（栏 collapsed 时栏滑出，手把留下） -->
+          <button id="toolbarToggleBtn" type="button" class="edge-toggle edge-toggle-left" title="折叠/展开工具栏">
+            <span class="arrow-icon">◀</span>
+          </button>
 
-              <button type="button" data-tool="circle" title="圆形标注">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.8"/>
-                </svg>
-                <span>圆形</span>
-              </button>
-
-              <button type="button" data-tool="pen" title="自由画笔">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <path d="M13 2L16 5L7 14H4V11L13 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                  <path d="M10.5 4.5L13.5 7.5" stroke="currentColor" stroke-width="1.5"/>
-                </svg>
-                <span>画笔</span>
-              </button>
-
-              <button type="button" data-tool="eraser" title="橡皮擦">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <path d="M3 13L8.5 4L14 9L8 15H3V13Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                  <path d="M3 15H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                <span>擦擦</span>
-              </button>
-
-              <button type="button" data-tool="crop" title="选择区域截图保存">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <path d="M5 1.5V13H16.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                  <path d="M1.5 5H13V16.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                <span>截图</span>
-              </button>
-
-            </div>
-          </div>
-
-          <div class="toolbar-section">
-            <h3>画笔颜色</h3>
-            <div id="colorPicker" class="color-palette">
-              <button type="button" data-color="#ff1f1f" class="color-dot active" style="--color-value: #ff1f1f;" title="红色"></button>
-              <button type="button" data-color="#1f75ff" class="color-dot" style="--color-value: #1f75ff;" title="蓝色"></button>
-              <button type="button" data-color="#1fff4f" class="color-dot" style="--color-value: #1fff4f;" title="绿色"></button>
-              <button type="button" data-color="#1a1714" class="color-dot" style="--color-value: #1a1714;" title="黑色"></button>
-              <button type="button" data-color="#ffd41f" class="color-dot" style="--color-value: #ffd41f;" title="黄色"></button>
-              <div class="color-dot custom-color-dot" title="自定义颜色">
-                <input type="color" id="customColorInput" value="#ff1f1f" />
-              </div>
-            </div>
-          </div>
-
-          <div class="toolbar-section flex-grow-section"></div>
-
-          <div class="toolbar-section">
-            <!-- ⌘Z 撤销 -->
-            <button id="undoButton" type="button" class="action-btn" title="撤销上一步 (⌘Z)">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path d="M2 4H8C9.7 4 11 5.3 11 7C11 8.7 9.7 10 8 10H5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <path d="M4 2L2 4L4 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              撤销
-            </button>
-            <!-- ESC 清空 -->
-            <button id="clearAnnotationsButton" type="button" class="action-btn danger-btn" title="清空全部标注 (ESC)">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path d="M2 2L10 10M10 2L2 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-              </svg>
-              清空
-            </button>
-          </div>
-        </aside>
-
-        <!-- 2. 中间取景工作区 -->
-        <main class="center-workspace">
-          <div class="preview-card">
-            <div class="preview-actions">
-              <div class="status-indicator">
-                <span id="qualityHint" class="status-text">未检测到活动摄像头</span>
-                <span id="actualResolution" class="res-text">实际分辨率: --</span>
-              </div>
-              <div class="primary-controls">
-                <button id="startCameraButton" type="button" class="control-btn accent-btn">开启摄像头</button>
-                <button id="stopCameraButton" type="button" class="control-btn" disabled>关闭摄像头</button>
-                <button id="captureButton" type="button" class="control-btn primary-btn" disabled title="拍照保存 (⌘S)">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                    <circle cx="7" cy="7.5" r="3" stroke="currentColor" stroke-width="1.4"/>
-                    <path d="M1 4.5H2.5L4 2.5H10L11.5 4.5H13V12H1V4.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          <!-- 左侧悬浮标注工具栏 -->
+          <aside class="left-toolbar" id="leftToolbar" aria-label="标注工具栏">
+            <div class="toolbar-section">
+              <div id="annotationToolbar" class="vertical-buttons">
+                <button type="button" data-tool="rect" class="active" title="矩形标注">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                    <rect x="2.5" y="2.5" width="13" height="13" rx="1.5" stroke="currentColor" stroke-width="1.8" />
                   </svg>
-                  拍照保存
                 </button>
-                <button id="refreshDevicesButton" type="button" class="control-btn">刷新设备</button>
-                <button id="openFolderButton" type="button" class="control-btn">打开目录</button>
+                <button type="button" data-tool="circle" title="圆形标注">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                    <circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.8" />
+                  </svg>
+                </button>
+                <button type="button" data-tool="pen" title="自由画笔">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                    <path d="M13 2L16 5L7 14H4V11L13 2Z" stroke="currentColor" stroke-width="1.5"
+                      stroke-linejoin="round" />
+                    <path d="M10.5 4.5L13.5 7.5" stroke="currentColor" stroke-width="1.5" />
+                  </svg>
+                </button>
+                <button type="button" data-tool="eraser" title="橡皮擦">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                    <path d="M3 13L8.5 4L14 9L8 15H3V13Z" stroke="currentColor" stroke-width="1.5"
+                      stroke-linejoin="round" />
+                    <path d="M3 15H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" data-tool="crop" title="选择区域截图保存">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                    <path d="M5 1.5V13H16.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                    <path d="M1.5 5H13V16.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  </svg>
+                </button>
               </div>
             </div>
 
-            <div class="preview-wrap">
-              <video id="preview" autoplay playsinline muted></video>
-              <img id="nativePreview" class="native-preview" alt="系统摄像头原生取景画面" hidden />
-              <canvas id="annotationCanvas" aria-label="画面标注层"></canvas>
-              <div id="shutterFlash" class="shutter-flash" hidden></div>
-              <!-- 截图确认悬浮操作栏 -->
-              <div id="cropActionToolbar" class="crop-action-toolbar" hidden>
-                <button type="button" class="crop-btn-confirm" id="cropConfirmButton" title="保存选区截图">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  确认保存
-                </button>
-                <button type="button" class="crop-btn-cancel" id="cropCancelButton" title="放弃选区">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  放弃
-                </button>
-              </div>
-              <div id="standbyOverlay" class="standby-overlay">
-                <!-- 摄像头图标 -->
-                <svg class="standby-camera-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-                  <circle cx="24" cy="24" r="22" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
-                  <path d="M8 16H13L16 12H32L35 16H40V36H8V16Z" stroke="rgba(255,255,255,0.35)" stroke-width="2" stroke-linejoin="round"/>
-                  <circle cx="24" cy="25" r="7" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
-                </svg>
-                <strong>摄像头未开启</strong>
-                <span>在右侧选好摄像头，点击"开启摄像头"</span>
-              </div>
-              <!-- A4 参考框：仅摄像头开启后可见，由 .camera-live class 控制 -->
-              <div class="a4-guide a4-portrait" id="a4Guide">
-                <span>把试卷四角放进此参考框中</span>
-              </div>
-            </div>
-          </div>
-        </main>
+            <hr class="toolbar-divider" />
 
-        <!-- 3. 右侧属性与最近列表 -->
-        <aside class="right-panel">
-          <!-- 属性区 -->
-          <section class="panel-section">
-            <h2>相机设置</h2>
-            <div class="settings-grid">
-              <label class="setting-item">
-                <span>选择摄像头</span>
-                <select id="deviceSelect" class="styled-select"></select>
-              </label>
-              <label class="setting-item">
-                <span>采集分辨率</span>
-                <select id="resolutionMode" class="styled-select">
-                  <option value="max" selected>最高分辨率 / 4K 优先</option>
-                  <option value="1080p">1080p</option>
-                  <option value="720p">720p</option>
-                </select>
-              </label>
-              <label class="setting-item">
-                <span>A4 参考框</span>
-                <select id="a4GuideMode" class="styled-select">
-                  <option value="portrait" selected>A4 竖版 (试卷/练习册)</option>
-                  <option value="landscape">A4 横版 (大试卷)</option>
-                  <option value="off">关闭辅助线</option>
-                </select>
-              </label>
-              <div class="setting-item">
-                <span>画面旋转</span>
-                <div class="rotation-controls">
-                  <button id="rotate90Button" type="button" class="rotate-btn" title="顺时针旋转 90°">
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                      <path d="M11 4H5C3.3 4 2 5.3 2 7C2 8.7 3.3 10 5 10H8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                      <path d="M9 2L11 4L9 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    旋转 90°
-                  </button>
-                  <button id="resetRotationButton" type="button" class="rotate-btn" title="重置为 0°">
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                      <path d="M2 7C2 4.2 4.2 2 7 2C9.8 2 12 4.2 12 7C12 9.8 9.8 12 7 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                      <path d="M2 4.5V7H4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    重置
-                  </button>
+            <div class="toolbar-section">
+              <div id="colorPicker" class="color-palette">
+                <button type="button" data-color="#ff1f1f" class="color-dot active" style="--color-value: #ff1f1f;"
+                  title="红色"></button>
+                <button type="button" data-color="#1f75ff" class="color-dot" style="--color-value: #1f75ff;"
+                  title="蓝色"></button>
+                <button type="button" data-color="#1fff4f" class="color-dot" style="--color-value: #1fff4f;"
+                  title="绿色"></button>
+                <button type="button" data-color="#1a1714" class="color-dot" style="--color-value: #1a1714;"
+                  title="黑色"></button>
+                <button type="button" data-color="#ffd41f" class="color-dot" style="--color-value: #ffd41f;"
+                  title="黄色"></button>
+                <div class="color-dot custom-color-dot" title="自定义颜色">
+                  <input type="color" id="customColorInput" value="#ff1f1f" />
                 </div>
               </div>
             </div>
-          </section>
 
-          <!-- 错题标签预设 -->
-          <section class="panel-section">
-            <h2>错题标签预设</h2>
-            <div class="settings-grid">
-              <label class="setting-item">
-                <span>学科 (Subject)</span>
-                <select id="presetSubject" class="styled-select">
-                  <option value="math" selected>数学</option>
-                  <option value="chinese">语文</option>
-                  <option value="english">英语</option>
-                  <option value="other">其它</option>
-                </select>
-              </label>
-              <label class="setting-item">
-                <span>难度 (Difficulty)</span>
-                <select id="presetDifficulty" class="styled-select">
-                  <option value="none" selected>未标注</option>
-                  <option value="easy">易</option>
-                  <option value="medium">中</option>
-                  <option value="hard">难</option>
-                </select>
-              </label>
-              <label class="setting-item">
-                <span>分类备注 (Notes)</span>
-                <input id="presetNotes" type="text" class="styled-input" placeholder="自定义分类或备注，如：第一单元" />
-              </label>
-            </div>
-          </section>
+            <hr class="toolbar-divider" />
 
-          <!-- 画质调节区 -->
-          <section class="panel-section" id="cameraControls">
-            <h2>画面调节</h2>
-            <!-- 硬件调节 -->
-            <div id="hardwareControlsWrapper" class="adjust-group" hidden>
-              <h3 class="adjust-heading">硬件调节</h3>
-              <div id="controlsList" class="controls-list"></div>
+            <div class="toolbar-section">
+              <button id="undoButton" type="button" class="action-btn" title="撤销上一步 (⌘Z)">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <path d="M2 4H8C9.7 4 11 5.3 11 7C11 8.7 9.7 10 8 10H5" stroke="currentColor" stroke-width="1.4"
+                    stroke-linecap="round" />
+                  <path d="M4 2L2 4L4 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
+              </button>
+              <button id="clearAnnotationsButton" type="button" class="action-btn danger-btn" title="清空全部标注 (ESC)">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <path d="M2 2L10 10M10 2L2 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                </svg>
+              </button>
             </div>
-            <!-- 软件调节 -->
-            <div id="softwareControlsWrapper" class="adjust-group" hidden>
-              <h3 class="adjust-heading">软件调节</h3>
-              <div id="softwareControlsList" class="controls-list"></div>
-            </div>
-            <!-- 待机提示 -->
-            <div id="unsupportedControlsHint" class="empty-hint">
-              开启摄像头后显示调节选项
-            </div>
-          </section>
+          </aside>
 
-          <!-- 最近拍摄区 -->
-          <section class="panel-section recent-captures-container">
-            <h2>
-              最近拍摄
-              <span id="captureCountBadge" class="count-badge" hidden>0</span>
-              <span class="sub-label">双击打开</span>
-            </h2>
-            <div class="recent-scroll">
-              <ol id="recentList" class="recent-grid"></ol>
-            </div>
-          </section>
-        </aside>
-      </div>
+          <!-- 折叠手把：贴画板右边缘，独立于右栏 -->
+          <button id="rightToolbarToggleBtn" type="button" class="edge-toggle edge-toggle-right" title="折叠/展开设置栏">
+            <span class="arrow-icon">▶</span>
+          </button>
 
-      <!-- 4. 底部可收起日志抽屉 -->
-      <footer class="log-drawer collapsed">
-        <button id="toggleLogButton" class="drawer-header" type="button">
-          <span class="drawer-title">系统日志 &amp; 设备诊断</span>
-          <span class="drawer-indicator">▲ 展开</span>
-        </button>
-        <div class="drawer-body">
-          <div class="log-grid">
-            <div class="log-column">
-              <h4>系统诊断 (macOS / ffmpeg)</h4>
-              <ul id="systemDevicesList" class="diagnostics-list"></ul>
+          <!-- 右侧悬浮设置栏 -->
+          <aside class="right-toolbar" id="rightToolbar" aria-label="相机与标签设置">
+            <div class="right-toolbar-scroll">
+              <!-- 相机设置 -->
+              <section class="floating-section">
+                <h2>相机设置</h2>
+                <div class="settings-grid">
+                  <label class="setting-item">
+                    <span>选择摄像头</span>
+                    <select id="deviceSelect" class="styled-select"></select>
+                  </label>
+                  <label class="setting-item">
+                    <span>采集分辨率</span>
+                    <select id="resolutionMode" class="styled-select">
+                      <option value="max" selected>最高分辨率 / 4K 优先</option>
+                      <option value="1080p">1080p</option>
+                      <option value="720p">720p</option>
+                    </select>
+                  </label>
+                  <label class="setting-item">
+                    <span>A4 参考框</span>
+                    <select id="a4GuideMode" class="styled-select">
+                      <option value="portrait" selected>A4 竖版 (试卷/练习册)</option>
+                      <option value="landscape">A4 横版 (大试卷)</option>
+                      <option value="off">关闭辅助线</option>
+                    </select>
+                  </label>
+                  <div class="setting-item">
+                    <span>画面旋转</span>
+                    <div class="rotation-controls">
+                      <button id="rotate90Button" type="button" class="rotate-btn" title="顺时针旋转 90°">
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                          <path d="M11 4H5C3.3 4 2 5.3 2 7C2 8.7 3.3 10 5 10H8" stroke="currentColor" stroke-width="1.5"
+                            stroke-linecap="round" />
+                          <path d="M9 2L11 4L9 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        </svg>
+                        旋转 90°
+                      </button>
+                      <button id="resetRotationButton" type="button" class="rotate-btn" title="重置为 0°">
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                          <path d="M2 7C2 4.2 4.2 2 7 2C9.8 2 12 4.2 12 7C12 9.8 9.8 12 7 12" stroke="currentColor"
+                            stroke-width="1.5" stroke-linecap="round" />
+                          <path d="M2 4.5V7H4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        </svg>
+                        重置
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 折叠的画面调节栏 -->
+                  <div class="collapsible-wrapper">
+                    <button type="button" class="collapsible-header" id="cameraControlsToggle">
+                      <span>画面调节</span>
+                      <span class="toggle-icon">▼</span>
+                    </button>
+                    <div class="collapsible-body collapsed" id="cameraControls">
+                      <div id="hardwareControlsWrapper" class="adjust-group" hidden>
+                        <h3 class="adjust-heading">硬件调节</h3>
+                        <div id="controlsList" class="controls-list"></div>
+                      </div>
+                      <div id="softwareControlsWrapper" class="adjust-group" hidden>
+                        <h3 class="adjust-heading">软件调节</h3>
+                        <div id="softwareControlsList" class="controls-list"></div>
+                      </div>
+                      <div id="unsupportedControlsHint" class="empty-hint">
+                        开启摄像头后显示调节选项
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- 错题标签预设 -->
+              <section class="floating-section">
+                <h2>错题标签预设</h2>
+                <div class="settings-grid">
+                  <label class="setting-item">
+                    <span>学科 (Subject)</span>
+                    <select id="presetSubject" class="styled-select">
+                      <option value="math" selected>数学</option>
+                      <option value="chinese">语文</option>
+                      <option value="english">英语</option>
+                      <option value="other">其它</option>
+                    </select>
+                  </label>
+                  <label class="setting-item">
+                    <span>难度 (Difficulty)</span>
+                    <select id="presetDifficulty" class="styled-select">
+                      <option value="none" selected>未标注</option>
+                      <option value="easy">易</option>
+                      <option value="medium">中</option>
+                      <option value="hard">难</option>
+                    </select>
+                  </label>
+                  <label class="setting-item">
+                    <span>分类备注 (Notes)</span>
+                    <input id="presetNotes" type="text" class="styled-input" placeholder="自定义分类或备注，如：第一单元" />
+                  </label>
+                </div>
+              </section>
             </div>
-            <div class="log-column">
-              <h4>浏览器检测 (MediaDevices)</h4>
-              <ul id="browserDevicesList" class="diagnostics-list"></ul>
-            </div>
-            <div class="log-column full-width">
-              <h4>运行日志</h4>
-              <div id="logsConsole" class="logs-console"></div>
-            </div>
+          </aside>
+
+          <!-- 全屏切换按钮 -->
+          <button type="button" class="preview-overlay-btn fullscreen-toggle-btn" id="fullscreenToggleBtn"
+            title="全屏取景标注">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="display:block;">
+              <path d="M2 6V2H6M12 2H16V6M16 12V16H12M6 16H2V12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+
+          <video id="preview" autoplay playsinline muted></video>
+          <img id="nativePreview" class="native-preview" alt="系统摄像头原生取景画面" hidden />
+          <canvas id="annotationCanvas" aria-label="画面标注层"></canvas>
+          <div id="shutterFlash" class="shutter-flash" hidden></div>
+
+          <!-- 截图确认悬浮操作栏 -->
+          <div id="cropActionToolbar" class="crop-action-toolbar" hidden>
+            <button type="button" class="crop-btn-confirm" id="cropConfirmButton" title="保存选区截图">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                  stroke-linejoin="round" />
+              </svg>
+              确认保存
+            </button>
+            <button type="button" class="crop-btn-cancel" id="cropCancelButton" title="放弃选区">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              放弃
+            </button>
+          </div>
+
+          <div id="standbyOverlay" class="standby-overlay">
+            <svg class="standby-camera-icon" width="48" height="48" viewBox="0 0 48 48" fill="none"
+              aria-hidden="true">
+              <circle cx="24" cy="24" r="22" stroke="rgba(255,255,255,0.12)" stroke-width="2" />
+              <path d="M8 16H13L16 12H32L35 16H40V36H8V16Z" stroke="rgba(255,255,255,0.35)" stroke-width="2"
+                stroke-linejoin="round" />
+              <circle cx="24" cy="25" r="7" stroke="rgba(255,255,255,0.35)" stroke-width="2" />
+            </svg>
+            <strong>摄像头未开启</strong>
+            <span>在右侧选好摄像头，点击"开启摄像头"</span>
+          </div>
+
+          <!-- A4 参考框：仅摄像头开启后可见 -->
+          <div class="a4-guide a4-portrait" id="a4Guide">
+            <span>把试卷四角放进此参考框中</span>
           </div>
         </div>
-      </footer>
+      </main>
+
+      <!-- 最近拍摄面板（独占侧栏，无折叠） -->
+      <aside class="recent-panel">
+        <section class="panel-section" id="recentCapturesSection">
+          <h2 class="recent-panel-title">
+            最近拍摄
+            <span id="captureCountBadge" class="count-badge" hidden>0</span>
+          </h2>
+          <span class="sub-label">双击大图预览，单击复制路径</span>
+          <div class="recent-scroll">
+            <ol id="recentList" class="recent-grid"></ol>
+          </div>
+        </section>
+      </aside>
     </div>
 
-    <canvas id="scratchCanvas" hidden></canvas>
-    <script src="/capture-effects.js"></script>
-    <script src="/ui.js"></script>
-    <script src="/annotation-handler.js"></script>
-    <script src="/camera-handler.js"></script>
-    <script src="/recent-handler.js"></script>
-    <script src="/app.js"></script>
-  </body>
+    <!-- 底部可收起日志抽屉 -->
+    <footer class="log-drawer collapsed">
+      <button id="toggleLogButton" class="drawer-header" type="button">
+        <span class="drawer-title">系统日志 &amp; 设备诊断</span>
+        <span class="drawer-indicator">▲ 展开</span>
+      </button>
+      <div class="drawer-body">
+        <div class="log-grid">
+          <div class="log-column">
+            <h4>系统诊断 (macOS / ffmpeg)</h4>
+            <ul id="systemDevicesList" class="diagnostics-list"></ul>
+          </div>
+          <div class="log-column">
+            <h4>浏览器检测 (MediaDevices)</h4>
+            <ul id="browserDevicesList" class="diagnostics-list"></ul>
+          </div>
+          <div class="log-column full-width">
+            <h4>运行日志</h4>
+            <div id="logsConsole" class="logs-console"></div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <canvas id="scratchCanvas" hidden></canvas>
+  <script src="/capture-effects.js"></script>
+  <script src="/ui.js"></script>
+  <script src="/annotation-handler.js"></script>
+  <script src="/camera-handler.js"></script>
+  <script src="/recent-handler.js"></script>
+  <script src="/app.js"></script>
+</body>
+
 </html>

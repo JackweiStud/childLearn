@@ -120,6 +120,75 @@
       });
     }
 
+    // 左侧标注工具栏折叠
+    if (UI.elements.toolbarToggleBtn && UI.elements.leftToolbar) {
+      UI.elements.toolbarToggleBtn.addEventListener('click', () => {
+        const isCollapsed = UI.elements.leftToolbar.classList.toggle('collapsed');
+        UI.log(isCollapsed ? '标注工具栏已收起' : '标注工具栏已展开');
+      });
+    }
+
+    // 右侧设置栏折叠
+    if (UI.elements.rightToolbarToggleBtn && UI.elements.rightToolbar) {
+      UI.elements.rightToolbarToggleBtn.addEventListener('click', () => {
+        const isCollapsed = UI.elements.rightToolbar.classList.toggle('collapsed');
+        UI.log(isCollapsed ? '设置栏已收起' : '设置栏已展开');
+      });
+    }
+
+    // 全屏切换功能
+    if (UI.elements.fullscreenToggleBtn) {
+      UI.elements.fullscreenToggleBtn.addEventListener('click', () => {
+        const container = UI.elements.previewWrap;
+        if (!container) return;
+        if (!document.fullscreenElement) {
+          container.requestFullscreen().catch(err => {
+            UI.log(`全屏失败: ${err.message}`, 'error');
+            UI.showToast(`全屏失败: ${err.message}`, 'error');
+          });
+        } else {
+          document.exitFullscreen();
+        }
+      });
+    }
+
+    // 全屏状态改变时重绘 canvas 并校准像素尺寸
+    document.addEventListener('fullscreenchange', () => {
+      if (window.AnnotationHandler) {
+        window.AnnotationHandler.resizeCanvas();
+      }
+    });
+
+    // 画面调节卡片折叠
+    if (UI.elements.cameraControlsToggle && UI.elements.cameraControls) {
+      UI.elements.cameraControlsToggle.addEventListener('click', () => {
+        const isCollapsed = UI.elements.cameraControls.classList.toggle('collapsed');
+        UI.elements.cameraControlsToggle.classList.toggle('active', !isCollapsed);
+      });
+    }
+
+    // 最近拍摄卡片折叠
+    if (UI.elements.recentCapturesToggle && UI.elements.recentCapturesBody) {
+      UI.elements.recentCapturesToggle.addEventListener('click', () => {
+        const isCollapsed = UI.elements.recentCapturesBody.classList.toggle('collapsed');
+        UI.elements.recentCapturesToggle.classList.toggle('active', !isCollapsed);
+      });
+    }
+
+    // 右栏高度跟随主区域 center-workspace 总高度（含顶部控制条 + 视频区）
+    // 内部 recent-scroll 自动滚动，避免长列表把页面拉到天上
+    const recentPanelEl = document.querySelector('.recent-panel');
+    const centerWorkspaceEl = document.querySelector('.center-workspace');
+    if (centerWorkspaceEl && recentPanelEl && 'ResizeObserver' in window) {
+      const syncHeight = () => {
+        // 全屏时 preview-wrap 是 100vh，不要把右栏也撑到 100vh
+        if (document.fullscreenElement === UI.elements.previewWrap) return;
+        recentPanelEl.style.height = centerWorkspaceEl.offsetHeight + 'px';
+      };
+      new ResizeObserver(syncHeight).observe(centerWorkspaceEl);
+      syncHeight();
+    }
+
     // 键盘快捷键：⌘S 拍照、⌘Z 撤销、ESC 清空标注
     document.addEventListener('keydown', (e) => {
       // 焦点在输入框时不拦截

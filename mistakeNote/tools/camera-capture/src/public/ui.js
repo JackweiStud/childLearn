@@ -29,6 +29,7 @@
     toggleLogButton: document.getElementById('toggleLogButton'),
     logDrawer: document.querySelector('.log-drawer'),
     logsConsole: document.getElementById('logsConsole'),
+    cameraControls: document.getElementById('cameraControls'),
     cameraControlsPanel: document.getElementById('cameraControls'),
     hardwareControlsWrapper: document.getElementById('hardwareControlsWrapper'),
     softwareControlsWrapper: document.getElementById('softwareControlsWrapper'),
@@ -45,6 +46,15 @@
     cropCancelButton: document.getElementById('cropCancelButton'),
     rotate90Button: document.getElementById('rotate90Button'),
     resetRotationButton: document.getElementById('resetRotationButton'),
+    previewWrap: document.getElementById('previewWrap'),
+    leftToolbar: document.getElementById('leftToolbar'),
+    toolbarToggleBtn: document.getElementById('toolbarToggleBtn'),
+    rightToolbar: document.getElementById('rightToolbar'),
+    rightToolbarToggleBtn: document.getElementById('rightToolbarToggleBtn'),
+    fullscreenToggleBtn: document.getElementById('fullscreenToggleBtn'),
+    cameraControlsToggle: document.getElementById('cameraControlsToggle'),
+    recentCapturesToggle: document.getElementById('recentCapturesToggle'),
+    recentCapturesBody: document.getElementById('recentCapturesBody'),
   };
 
   // 控制台日志功能
