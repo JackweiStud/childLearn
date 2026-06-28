@@ -6,7 +6,7 @@ const {
   normalizeSoftwareAdjustments,
   computeZoomCrop,
   cssFilterForAdjustments,
-} = require('../../tools/camera-capture/src/public/capture-effects.js');
+} = require('../../../tools/camera-capture/src/public/capture-effects.js');
 
 test('软件缩放使用中心裁剪并保持输出尺寸不变', () => {
   const crop = computeZoomCrop({

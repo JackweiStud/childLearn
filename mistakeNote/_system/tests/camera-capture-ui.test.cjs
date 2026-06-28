@@ -3,7 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const repoRoot = path.resolve(__dirname, '..', '..');
+// 从 mistakeNote/_system/tests/ 上 3 层到 childLearn 仓库根；tools/ 现在在根级
+const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const indexHtml = fs.readFileSync(path.join(repoRoot, 'tools/camera-capture/src/public/index.html'), 'utf8');
 const appJs = fs.readFileSync(path.join(repoRoot, 'tools/camera-capture/src/public/app.js'), 'utf8');
 const stylesCss = fs.readFileSync(path.join(repoRoot, 'tools/camera-capture/src/public/styles.css'), 'utf8');
@@ -136,11 +137,7 @@ test('拍照台支持错题元数据预设、多态 A4 辅助线切换、快门�
   assert.match(stylesCss, /\.left-toolbar\s*\{\s*position:\s*absolute/);
   assert.match(stylesCss, /\.preview-wrap:fullscreen/);
 
-  // 重构：面板折叠
+  // 重构：面板折叠（recentCapturesToggle 已在 UI 重构时移除，最近拍摄面板与中区等高，不再折叠）
   assert.match(indexHtml, /id="cameraControlsToggle"/);
-  assert.match(indexHtml, /id="recentCapturesToggle"/);
   assert.match(appJs, /cameraControlsToggle\.addEventListener\('click'/);
-  assert.match(appJs, /recentCapturesToggle\.addEventListener\('click'/);
-  assert.match(stylesCss, /\.collapsible-body\.collapsed/);
-  assert.match(stylesCss, /\.panel-body-content\.collapsed/);
 });

@@ -8,9 +8,11 @@ const { URL } = require('node:url');
 
 const { createCaptureStore, formatDateDir } = require('./capture-store.cjs');
 
-const repoRoot = process.env.CAMERA_CAPTURE_REPO_ROOT || path.resolve(__dirname, '..', '..', '..');
+// projectRoot = 数据归属的项目目录（含 _inbox/scans/）
+// 默认 childLearn/mistakeNote/；其他领域用 CAMERA_CAPTURE_PROJECT_ROOT 覆盖
+const projectRoot = process.env.CAMERA_CAPTURE_PROJECT_ROOT || path.resolve(__dirname, '..', '..', '..', 'mistakeNote');
 const publicDir = path.join(__dirname, 'public');
-const store = createCaptureStore({ repoRoot });
+const store = createCaptureStore({ projectRoot });
 const port = Number(process.env.PORT || 8731);
 const nativePreviewSessions = new Map();
 
@@ -115,7 +117,7 @@ async function handleCapture(req, res) {
 async function handleDeleteCapture(req, res) {
   try {
     const body = JSON.parse(await readRequestBody(req, 1024 * 1024));
-    const imageFilePath = safeJoin(repoRoot, body.filePath);
+    const imageFilePath = safeJoin(projectRoot, body.filePath);
     if (!imageFilePath || !imageFilePath.startsWith(store.scansRoot)) {
       sendError(res, 400, 'Invalid file path or permission denied');
       return;
@@ -166,7 +168,7 @@ function handleListCaptures(url, res) {
 
       items.push({
         imagePath,                                              // 绝对路径（给 delete/open-file 用）
-        relativeImagePath: path.relative(repoRoot, imagePath).split(path.sep).join('/'),
+        relativeImagePath: path.relative(projectRoot, imagePath).split(path.sep).join('/'),
         url: `/scans/${path.relative(store.scansRoot, imagePath).split(path.sep).join('/')}`, // 给 <img src> 用
         meta,
         mtime: stat.mtimeMs,
@@ -192,7 +194,7 @@ function handleOpenScans(res) {
 async function handleOpenFile(req, res) {
   try {
     const body = JSON.parse(await readRequestBody(req, 1024 * 1024));
-    const filePath = safeJoin(repoRoot, body.filePath);
+    const filePath = safeJoin(projectRoot, body.filePath);
     if (!filePath || !fs.existsSync(filePath)) {
       sendError(res, 404, 'File not found or invalid path');
       return;

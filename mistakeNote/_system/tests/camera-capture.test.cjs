@@ -4,20 +4,20 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { createCaptureStore } = require('../../tools/camera-capture/src/capture-store.cjs');
+const { createCaptureStore } = require('../../../tools/camera-capture/src/capture-store.cjs');
 const {
   buildAvfoundationCaptureArgs,
   buildAvfoundationPreviewArgs,
   extractJpegFrames,
   parseAvfoundationVideoDevices,
   parseFfprobeDimensions,
-} = require('../../tools/camera-capture/src/server.cjs');
+} = require('../../../tools/camera-capture/src/server.cjs');
 
 test('保存 USB 摄像头抓拍为按日期分类的 JPG 和同名 JSON 元数据', async () => {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mistake-camera-'));
   const fixedDate = new Date('2026-06-24T13:05:01.000Z');
   const store = createCaptureStore({
-    repoRoot: rootDir,
+    projectRoot: rootDir,
     now: () => fixedDate,
   });
 

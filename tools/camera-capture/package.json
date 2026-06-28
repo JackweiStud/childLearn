@@ -1,0 +1,14 @@
+{
+  "name": "childlearn-camera-capture",
+  "version": "0.2.0",
+  "private": true,
+  "description": "通用拍照采集工具：纸质 → 数字。默认服务 mistakeNote，可通过 CAMERA_CAPTURE_PROJECT_ROOT 复用到 englishNote/readingNote 等其他领域。",
+  "scripts": {
+    "camera": "node src/server.cjs",
+    "start": "node src/server.cjs",
+    "test": "node --test ../../mistakeNote/_system/tests/camera-capture.test.cjs ../../mistakeNote/_system/tests/camera-capture-ui.test.cjs ../../mistakeNote/_system/tests/camera-capture-effects.test.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

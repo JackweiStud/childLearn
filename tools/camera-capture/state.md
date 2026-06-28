@@ -4,7 +4,11 @@
 
 ---
 
-## 一、在 mistakeNote 中的位置
+## 一、在 childLearn 中的位置
+
+camera-capture 位于 `childLearn/tools/camera-capture/`，是**与领域无关的通用采集工具**：默认服务 mistakeNote（错题），但通过 `CAMERA_CAPTURE_PROJECT_ROOT` 环境变量可复用到 englishNote / readingNote 等未来领域，**无需改代码**。
+
+当前服务 mistakeNote 时的位置：
 
 ```
 孩子做错题 → [拍照采集] → 识别/切题 → 归档到错题库 → 生成复习卷 → 孩子重做
@@ -12,7 +16,7 @@
               本工具
 ```
 
-camera-capture 是整条链的**第一环**——把纸上的试卷变成数字文件。它的下游是识别、裁剪、归档，最终产出物是给孩子做的复习卷。
+camera-capture 是错题管线的**第一环**——把纸上的试卷变成数字文件。它的下游是识别、裁剪、归档，最终产出物是给孩子做的复习卷。
 
 **这个工具成功的标志**：家长拿到孩子批改完的试卷后，30 秒内完成拍照并存入系统，不需要任何额外操作。
 

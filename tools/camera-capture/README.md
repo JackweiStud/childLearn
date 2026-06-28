@@ -1,23 +1,32 @@
-# 错题拍照台
+# 拍照台（通用采集工具）
 
-本工具是 mistakeNote 错题管线的**第一环**：在 Mac 上把孩子的纸质试卷/作业拍下来，存到 `mistakeNote/_inbox/scans/YYYY-MM-DD/`。
+把纸质试卷/作业拍下来，存到 `<某项目>/_inbox/scans/YYYY-MM-DD/`。
+
+**默认服务对象：mistakeNote（错题）。** 其他领域（如未来的 englishNote / readingNote）可通过环境变量复用，**不需要改代码**——见下方"跨领域复用"。
 
 下游的识别 / 切题 / 归档 / 复习卷暂不在本工具范围内，详见 state.md。
 
 ## 启动
 
 ```bash
-cd /Users/jackwl/Code/childLearn/mistakeNote/tools/camera-capture
+cd /Users/jackwl/Code/childLearn/tools/camera-capture
 npm run camera
 ```
 
-默认打开：
-
-```text
-http://localhost:8731
-```
+默认打开：`http://localhost:8731`，输出默认到 `childLearn/mistakeNote/_inbox/scans/YYYY-MM-DD/`。
 
 浏览器第一次访问时会请求摄像头权限。允许后，页面会优先选择名称包含 `USB Camera` 的设备。
+
+## 跨领域复用
+
+启动前设环境变量 `CAMERA_CAPTURE_PROJECT_ROOT` 指向另一个项目根，拍照就会写到那个项目的 `_inbox/scans/`：
+
+```bash
+# 例：服务"英语笔记"领域
+CAMERA_CAPTURE_PROJECT_ROOT=/Users/jackwl/Code/childLearn/englishNote npm run camera
+```
+
+只要目标项目根下存在 `_inbox/scans/` 结构（不存在会自动创建），就能用。
 
 ## 输出格式
 
