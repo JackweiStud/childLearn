@@ -1,6 +1,8 @@
 # 错题拍照台
 
-本工具用于在 Mac 上调用外接 USB 摄像头，拍摄完整试卷照片，并保存到 `mistakeNote/_inbox/scans/YYYY-MM-DD/`。
+本工具是 mistakeNote 错题管线的**第一环**：在 Mac 上把孩子的纸质试卷/作业拍下来，存到 `mistakeNote/_inbox/scans/YYYY-MM-DD/`。
+
+下游的识别 / 切题 / 归档 / 复习卷暂不在本工具范围内，详见 state.md。
 
 ## 启动
 
@@ -9,7 +11,7 @@ cd /Users/jackwl/Code/childLearn/mistakeNote/tools/camera-capture
 npm run camera
 ```
 
-默认打开:
+默认打开：
 
 ```text
 http://localhost:8731
@@ -17,94 +19,118 @@ http://localhost:8731
 
 浏览器第一次访问时会请求摄像头权限。允许后，页面会优先选择名称包含 `USB Camera` 的设备。
 
-## 输出
+## 输出格式
 
-每次拍照会生成两份文件:
-
-```text
-_inbox/scans/YYYY-MM-DD/YYYYMMDD-HHMMSS-usb-camera-001.jpg
-_inbox/scans/YYYY-MM-DD/YYYYMMDD-HHMMSS-usb-camera-001.json
-```
-
-JPG 是原始抓拍图；JSON 是基础元数据。后续错题识别、裁剪和归档再基于这些原始素材继续处理。
-
-## 当前边界
-
-第一版只做拍照采集:
-
-- 摄像头选择
-- 最高分辨率 / 4K 优先采集
-- 显示实际视频流分辨率
-- 手动开启/关闭摄像头
-- 刷新摄像头列表
-- 实时预览
-- A4 辅助框
-- 红色标注:矩形、圆形、自由画笔
-- 点击拍照保存
-- 最近拍摄列表
-- 过曝/过暗提示
-- 按当前设备能力显示摄像头调节项
-- 软件兜底调节:缩放、亮度、对比度、饱和度
-
-暂不做 OCR、自动识别错题、自动切题、自动归档。
-
-## 4K / 最高分辨率说明
-
-页面默认选择“最高分辨率 / 4K 优先”，请求浏览器给出 `3840×2160` 的理想视频流。
-
-这不是强制 `exact 4K`，因为强制 exact 会导致不支持 4K 的摄像头直接启动失败。浏览器会按设备能力返回最接近的可用分辨率，页面底部会显示“实际分辨率”，例如:
+每次拍照生成两份配对文件：
 
 ```text
-实际分辨率: 3840 × 2160
-实际分辨率: 1920 × 1080
+_inbox/scans/YYYY-MM-DD/YYYYMMDD-HHMMSS-usb-camera-001.jpg   ← 原始图（含标注）
+_inbox/scans/YYYY-MM-DD/YYYYMMDD-HHMMSS-usb-camera-001.json  ← 元数据
 ```
 
-判断图像质量时以“实际分辨率”为准，不要只看摄像头包装写的 4K。
+元数据 JSON 里 `status: 'unprocessed'` 表示还没被下游消费。下游处理完后应更新此字段。
 
-## 红色标注说明
+## 能力清单（当前实际支持的功能）
 
-预览画面上可以使用:
+### 📷 采集
+- USB 摄像头 + iPhone Continuity Camera 双通道（WebRTC 优先 / ffmpeg AVFoundation 兜底）
+- 摄像头切换、刷新设备列表
+- **启动后 3 秒自动静默重扫**——捕获 macOS 异步注册的 iPhone（Continuity Camera 经常迟到）
+- **iPhone 未检测时主动提示**——列表里没看到 iPhone 时显示橙色提示卡，列出 5 条 macOS Continuity Camera 触发条件
+- 4K / 1080p / 720p 分辨率切换（native 通道自动灰显，仅 WebRTC 可选）
+- 实时预览 + 显示实际分辨率
+- 默认不开摄像头，放好试卷后手动开启
 
-- 矩形
-- 圆形
-- 自由画笔
-- 清空
+### 🖊️ 标注（全部画入保存的 JPG）
+- 矩形、圆形、自由画笔、橡皮擦、**插入文字**
+- **多色画笔**：红 / 蓝 / 绿 / 黑 / 黄
+- **文字工具**：5 种字体（系统/宋/黑/楷/等宽）× 6 种字号（16-64px）× 复用颜色选择
+- 撤销上一笔（⌘Z）、清空全部（ESC）
+- **区域截图**：crop 工具画框 → 拖把手微调 → 确认即保存为独立 JPG，蓝色虚线 + 遮罩反馈
 
-这些标注会画入最终保存的 JPG，适合在拍摄时框出疑似错题区域或老师批改痕迹。
+### 🎛️ 画质调节
+- 硬件控制：缩放/亮度/对比度/饱和度/锐度/曝光/焦距/色温（取决于设备 `getCapabilities()` 暴露）
+- 硬件枚举：对焦/曝光/白平衡模式
+- 软件兜底：缩放（1×–3×，中心裁剪）/ 亮度 / 对比度 / 饱和度（CSS filter，同时影响预览和保存）
+- 硬件优先，缺什么补什么
+- 自动过曝/过暗检测（每 1.5 秒采样）
 
-## iPhone 桥接方向
+### 🚧 拍摄辅助
+- A4 参考框（竖版/横版/关闭）
+- 画面旋转 90°（含旋转后标注坐标的正确映射）
+- 全屏取景标注（含全屏后 canvas 重绘）
 
-有两条路线:
+### 💾 存储与回看
+- 自动按日期建目录 `_inbox/scans/YYYY-MM-DD/`
+- JPG + JSON 配对保存，同秒文件序号防碰撞
+- 元数据包含：时间、设备、分辨率、质量、阶段、subject/difficulty/notes 等
+- 最近拍摄列表（最多 10 条）：
+  - **刷新页面后保留**（启动时拉 `GET /api/captures?limit=10` 扫今天目录）
+  - 双击调用 macOS 原生 Preview 看大图
+  - 单击「复制」按钮复制绝对路径
+  - 单击「删除」按钮物理删除 JPG + JSON
+- 一键 Finder 打开保存目录
 
-1. **Continuity Camera Webcam**
-   - iPhone 作为 Mac 的摄像头出现在摄像头列表里。
-   - 可以进入本 Web 页面的摄像头下拉框。
-   - 优点:能复用当前实时预览、标注、拍照保存流程。
-   - 缺点:Web 浏览器是否暴露 iPhone、暴露什么分辨率和硬件控制项，取决于 macOS/浏览器。
+### ⌨️ 快捷键
+- `⌘S`：拍照保存
+- `⌘Z`：撤销最近一笔
+- `ESC`：清空所有标注
 
-2. **Continuity Camera Scan Documents / Take Photo**
-   - 从 Mac 的 Finder/Notes/Preview 等入口触发 iPhone 拍照或扫描。
-   - iPhone 会做文档边缘检测和透视校正。
-   - 优点:文档扫描质量通常比普通 webcam 好。
-   - 缺点:它不是一个普通 Web 摄像头流，不能直接嵌进当前浏览器预览；更适合作为独立导入入口。
+### 🎨 UI
+- 暖色调主题 + 暗色工具栏（与黑色视频画板融洽）
+- 左右工具栏可折叠（边缘 toggle 按钮）
+- 底部日志抽屉（fixed bottom sheet，向上遮挡不撑页面）
+- 全屏按钮固定右上角
 
-后续如果要做 iPhone 扫描导入，更合理的方式是在工具里增加“导入最近扫描文件/监听 inbox 文件夹”，而不是强行把扫描文档功能塞进浏览器摄像头 API。
+## iPhone Continuity Camera 现状
 
-## 摄像头调节说明
+工具已经做到的两条通道：
 
-页面会在摄像头开启后读取浏览器暴露的 `getCapabilities()`。
+1. **Continuity Camera Webcam → WebRTC 通道** ✅
+   - iPhone 在 macOS 注册成功后会出现在浏览器 `enumerateDevices` 列表里
+   - 走 `getUserMedia` 拉流，跟普通 USB 摄像头一样用
+   - 优点：可控的分辨率、可用硬件 control
 
-如果当前摄像头和浏览器支持，页面会显示缩放、亮度、对比度、饱和度、锐度、曝光补偿、焦距/对焦距离、色温、对焦模式、曝光模式、白平衡模式等控制项。
+2. **AVFoundation 兜底 → native 通道** ✅
+   - 若浏览器没把 iPhone 暴露出来，工具会通过 `ffmpeg -list_devices` 检测，并作为 `[系统原生]` 选项追加
+   - 后端通过 ffmpeg MJPEG 推流给前端轮询
+   - 适用：iPhone 在 macOS AVFoundation 注册了但浏览器没拿到
 
-这些能力不能写死保证。某些 USB 摄像头虽然硬件支持，但浏览器不一定开放控制接口；这种情况下页面会明确显示“当前设备/浏览器没有暴露硬件调节项”。
+工具未做（**且按设计明确不做**）：
 
-为避免卡在浏览器/设备能力边界，页面另外提供“软件兜底调节”:
+- ❌ Continuity Camera Scan Documents 导入（iPhone 端的扫描文档功能）
+  - 它不是普通 webcam 流，不能直接嵌进浏览器
+  - 计划方向：监听 `_inbox/` 文件夹接收扫描结果（state.md 中期方向，未实现）
 
-- 软件缩放:中心裁剪后保持原输出分辨率
-- 软件亮度
-- 软件对比度
-- 软件饱和度
+## 摄像头调节边界
 
-软件调节不改变摄像头硬件参数，但会同时影响实时预览和最终保存的 JPG。也就是说，即使硬件 `zoom` / `brightness` 没暴露，拍题时仍然可以把画面放大、调亮、增强对比度后保存。
+页面在摄像头开启后读取浏览器 `getCapabilities()`，按设备能力动态渲染硬件 control。
 
-注意:焦距/自动对焦这类光学行为不能被软件真正替代。软件缩放只是数字裁剪，软件锐化也不能解决原始画面失焦；如果文字本身糊了，还是要调摄像头距离、纸面位置或换更适合俯拍的设备。
+**能力受限场景**：某些 USB 摄像头硬件支持调节但浏览器没暴露接口，页面会明确显示「当前设备/浏览器没有暴露硬件调节项」，自动切到软件兜底。
+
+**软件兜底**：CSS filter 实现，能调亮度/对比度/饱和度/缩放，但**不能替代光学行为**——焦距、自动对焦、真正的镜头变焦做不到。文字糊了还是要调摄像头距离或换设备。
+
+## 测试
+
+```bash
+# 后端核心逻辑
+node mistakeNote/_system/tests/camera-capture.test.cjs
+
+# UI 关键交互
+node mistakeNote/_system/tests/camera-capture-ui.test.cjs
+
+# 软件滤镜参数转换
+node mistakeNote/_system/tests/camera-capture-effects.test.cjs
+```
+
+## 当前不做的事（明确边界）
+
+下面这些属于错题管线的下游，不在 camera-capture 范围内：
+
+- ✗ OCR 文字识别
+- ✗ 自动识别错题（区分题目和评卷批注）
+- ✗ 自动切题（从整张试卷裁出单道题）
+- ✗ 自动归档到 `二年级/数学/错题/`
+- ✗ 生成复习卷
+
+`status: 'unprocessed'` 这个字段就是给下游用的——下游处理完应该改成对应状态。
