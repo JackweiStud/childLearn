@@ -31,10 +31,17 @@
   function showCropToolbar() {
     if (!state.cropBox || !UI.elements.cropActionToolbar) return;
     const canvas = UI.elements.annotationCanvas;
-    const rect = canvas.getBoundingClientRect();
+    const wrap = UI.elements.previewWrap;
+    if (!wrap) return;
+
+    // toolbar 是 preview-wrap 的子元素 (position: absolute)，定位必须相对 preview-wrap。
+    // canvas CSS rotate 后视觉包围盒会溢出 preview-wrap，两者左上角不再重合——必须
+    // 走"视口绝对坐标 → 相对 preview-wrap 偏移"才能放对位置。
+    const canvasRect = canvas.getBoundingClientRect();  // 视觉包围盒（含旋转）
+    const wrapRect = wrap.getBoundingClientRect();      // preview-wrap 自己
     const rot = (window.CameraHandler && window.CameraHandler.state.rotationDeg) || 0;
 
-    // cropBox 是 layout 归一化；toolbar 要在视觉布局上定位，必须先把 4 顶点正向旋转
+    // cropBox 是 layout 归一化；toolbar 要在视觉布局上定位，4 顶点先正向旋转
     const lx1 = Math.min(state.cropBox.start.x, state.cropBox.end.x);
     const ly1 = Math.min(state.cropBox.start.y, state.cropBox.end.y);
     const lx2 = Math.max(state.cropBox.start.x, state.cropBox.end.x);
@@ -48,25 +55,33 @@
     ];
     const vxs = corners.map(c => c.x);
     const vys = corners.map(c => c.y);
-    const x1 = Math.min(...vxs) * rect.width;
-    const y1 = Math.min(...vys) * rect.height;
-    const x2 = Math.max(...vxs) * rect.width;
-    const y2 = Math.max(...vys) * rect.height;
+
+    // 视觉归一化 → 视口绝对像素（基于 canvas 视觉包围盒）
+    const absX1 = canvasRect.left + Math.min(...vxs) * canvasRect.width;
+    const absY1 = canvasRect.top  + Math.min(...vys) * canvasRect.height;
+    const absX2 = canvasRect.left + Math.max(...vxs) * canvasRect.width;
+    const absY2 = canvasRect.top  + Math.max(...vys) * canvasRect.height;
+
+    // 视口绝对 → 相对 preview-wrap（toolbar 的定位参考系）
+    const x1 = absX1 - wrapRect.left;
+    const y1 = absY1 - wrapRect.top;
+    const x2 = absX2 - wrapRect.left;
+    const y2 = absY2 - wrapRect.top;
 
     // 定位在截图框正下方，如果贴底，则显示在正上方
     let top = y2 + 10;
     const toolbarHeight = 45;
-    if (top + toolbarHeight > rect.height) {
+    if (top + toolbarHeight > wrapRect.height) {
       top = y1 - toolbarHeight - 10;
       if (top < 0) top = 10;
     }
 
-    // 水平居中
+    // 水平居中（边界用 wrapRect.width，因为 toolbar 在 preview-wrap 内）
     const width = x2 - x1;
     const toolbarWidth = 180;
     let left = x1 + width / 2 - toolbarWidth / 2;
     if (left < 10) left = 10;
-    if (left + toolbarWidth > rect.width) left = rect.width - toolbarWidth - 10;
+    if (left + toolbarWidth > wrapRect.width) left = wrapRect.width - toolbarWidth - 10;
 
     UI.elements.cropActionToolbar.style.left = `${left}px`;
     UI.elements.cropActionToolbar.style.top = `${top}px`;
@@ -327,6 +342,11 @@
       canvas.height = height;
     }
     render();
+
+    // 如果 crop toolbar 正在显示（cropBox 还没确认/取消），跟着旋转 / 窗口缩放重新定位
+    if (state.cropBox && UI.elements.cropActionToolbar && !UI.elements.cropActionToolbar.hidden) {
+      showCropToolbar();
+    }
   }
 
   // 坐标归一化转换
