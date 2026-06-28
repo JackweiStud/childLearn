@@ -34,7 +34,6 @@ description: 将已经作答、涂写或批改过的试卷与练习册照片重�
 - 使用 Poppler 的 `pdftoppm`、`pdfinfo` 渲染和检查 PDF。
 - 使用 `scripts/run_with_runtime.sh` 调用本 Skill 的 Python 脚本；它会优先使用 Codex 工作区自带 Python，再回退到系统 `python3`。
 - 使用 `scripts/preflight.py` 检查源图尺寸、Poppler、Python 依赖和字体。图片长边低于 2000px 只作为质量警告；依赖、字体、格式等硬缺口才阻塞流程。批量整页高质量重建需要硬控尺寸时，显式加 `--strict-image-size`。
-- 使用 `scripts/clean_source_image.py` 可选清理明显红橙批改或彩色圈画；它只做颜色蒙版和增强，不能恢复被黑色笔迹或同色内容覆盖的原文。
 - 使用 `scripts/find_font.py` 定位中文字体和符号字体，禁止在生成脚本中保留占位字体路径。
 
 ### 1. 建立原始事实
@@ -48,17 +47,6 @@ scripts/run_with_runtime.sh scripts/preflight.py <按页序排列的图片...> -
 ```
 
 预检状态为 `warning` 时可以继续建立内容模型，但必须把警告纳入置信度和待确认判断；不要把低分辨率本身等同于“不能处理”。
-
-如果原图有明显红橙批改或彩色圈画，先生成一份非 AI 清理候选图用于辅助观察，不要覆盖原图：
-
-```bash
-scripts/run_with_runtime.sh scripts/clean_source_image.py <源图> \
-  --output work/<卷名或工作名>/cleaned-page-1.png \
-  --report work/<卷名或工作名>/cleaned-page-1.report.json \
-  --json
-```
-
-清理候选图只能帮助观察和 OCR。最终题目事实仍以原图、用户确认、可核验原卷或明确标注的上下文推断为准。
 
 - 为每份试卷创建持久中间模型，不要只把识别结果留在对话上下文：
 

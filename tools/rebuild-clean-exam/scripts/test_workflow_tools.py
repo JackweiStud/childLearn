@@ -10,7 +10,6 @@ import tempfile
 import unittest
 import zlib
 from pathlib import Path
-from PIL import Image, ImageDraw
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -149,29 +148,6 @@ class WorkflowToolTests(unittest.TestCase):
         self.assertIn("pdftoppm", result["missing_commands"])
         self.assertIn("reportlab", result["missing_python_modules"])
         self.assertGreaterEqual(len(result["issues"]), 3)
-
-    def test_clean_source_image_masks_colored_markup_and_keeps_black_print(self) -> None:
-        image = self.root / "marked.png"
-        source = Image.new("RGB", (120, 80), "white")
-        draw = ImageDraw.Draw(source)
-        draw.rectangle((12, 18, 44, 42), fill=(0, 0, 0))
-        draw.rectangle((62, 18, 96, 42), fill=(245, 120, 20))
-        source.save(image)
-        output = self.root / "clean.png"
-        report = self.root / "report.json"
-        module = load_module("clean_source_image", SCRIPTS / "clean_source_image.py")
-
-        result = module.clean_image(image, output, report)
-
-        self.assertEqual("warning", result["status"])
-        self.assertGreater(result["masked_pixels"], 0)
-        self.assertTrue(output.is_file())
-        self.assertTrue(report.is_file())
-        cleaned = Image.open(output).convert("RGB")
-        self.assertLess(sum(cleaned.getpixel((20, 25))), 80)
-        self.assertGreater(sum(cleaned.getpixel((75, 25))), 700)
-        saved = json.loads(report.read_text(encoding="utf-8"))
-        self.assertEqual(result["masked_pixels"], saved["masked_pixels"])
 
 
 if __name__ == "__main__":
