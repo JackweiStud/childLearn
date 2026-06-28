@@ -172,4 +172,48 @@ src/public/
 
 ---
 
-*最后更新：2026-06-27*
+## 七、开发踩坑笔记
+
+> 这个工具涉及 canvas 标注 + CSS transform（旋转、缩放、全屏），栽过几次坑沉淀在这里。改这块代码前先读这一节，能少走半天弯路。
+
+### 7.1 CSS transform 后的 DOM 几何，所有"自带方法"都要重审
+
+凡是元素带 `transform: rotate/scale`，下面这些 API 的语义跟直觉不一样：
+
+| API | 含义 | 受 CSS transform 影响？ |
+|---|---|---|
+| `getBoundingClientRect()` | **视觉**包围盒——已经被 transform 后的那个矩形 | ✅ 受影响（rotate 90° 后 width/height **互换**） |
+| `offsetWidth / offsetHeight` | **layout** 尺寸——元素布局时的真实宽高 | ❌ 不受影响 |
+| `clientX / clientY`（事件） | 鼠标在视口里的物理像素 | ❌ 不受影响（永远是视口绝对坐标） |
+
+**已经踩过的两个具体坑：**
+
+1. **canvas 像素缓冲区尺寸用 `getBoundingClientRect()`** → 旋转 90° 后 buffer 宽高反了，绘制扭曲。**正解：用 `offsetWidth × dpr` 设 `canvas.width`**。
+2. **点击归一化坐标用视觉宽高直接除** → 16:9 画布旋转 90° 后视觉宽高比变成 9:16，归一化值畸变。**正解：先把视觉坐标用视觉宽高做逆旋转，还原成 layout 坐标，再用 `offsetWidth/Height` 归一化**（参考点固定为「未旋转 canvas 的左上角」）。
+
+### 7.2 全屏切换是异步 reflow
+
+`fullscreenchange` 事件触发那一刻浏览器还没完成 layout，立刻取 `offsetWidth` 拿到的是旧值。
+
+**正解：** 用 `requestAnimationFrame` 延迟一帧再调 resize/重绘函数。
+
+### 7.3 ResizeObserver 要观察对的元素
+
+之前 `recent-panel` 高度跟不上主区，因为 ResizeObserver 观察的是 `previewWrap`，漏掉了上面的控制条高度。**正解：观察包含**所有**需要同步内容的最外层容器**（这里是 `centerWorkspace`）。
+
+### 7.4 几何/坐标改动的回归测试矩阵
+
+凡是涉及坐标/尺寸计算的修改，**手动验证必须覆盖**：
+
+- [ ] 旋转 0° 画一笔 → 落点正确
+- [ ] 旋转 90° 画一笔 → 落点正确
+- [ ] 旋转 180° 画一笔 → 落点正确
+- [ ] 旋转 270° 画一笔 → 落点正确
+- [ ] 进/退全屏后画一笔 → 落点正确
+- [ ] 浏览器窗口拉伸后画一笔 → 落点正确
+
+少测一个就可能埋坑。这次 90/270 度的畸变就是因为只在 0° 下肉眼"看着对"就放过了。
+
+---
+
+*最后更新：2026-06-28*
