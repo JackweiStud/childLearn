@@ -42,6 +42,32 @@ def normalize_text(value: str) -> str:
     return "".join(value.split())
 
 
+def text_extraction_report(
+    page_texts: list[str | None],
+    checks_requested: bool,
+) -> dict[str, Any]:
+    normalized_pages = [normalize_text(text or "") for text in page_texts]
+    normalized = "".join(normalized_pages)
+    pages_without_text = [
+        index for index, text in enumerate(normalized_pages, 1) if not text
+    ]
+    warnings = []
+    if checks_requested and not normalized:
+        warnings.append(
+            "无法从 PDF 文本层提取任何文字；required/forbidden 只能作为失败信号，不能证明禁用内容不存在"
+        )
+    elif checks_requested and pages_without_text:
+        warnings.append(
+            f"部分页面无法从 PDF 文本层提取文字：{pages_without_text}；请结合渲染图人工复核"
+        )
+    return {
+        "normalized": normalized,
+        "characters": len(normalized),
+        "pages_without_text": pages_without_text,
+        "warnings": warnings,
+    }
+
+
 def page_size_is_a4(page: Any, tolerance: float = 2.0) -> bool:
     width = float(page.mediabox.width)
     height = float(page.mediabox.height)
@@ -76,14 +102,14 @@ def collect_used_fonts(
     reader: PdfReader,
     embedded: set[str],
     unembedded: set[str],
-    visited: set[int],
+    visited: set[tuple[int, tuple[str, bool] | None]],
     initial_font: tuple[str, bool] | None = None,
 ) -> None:
     if stream is None:
         return
 
     stream = resolve_object(stream)
-    marker = id(stream)
+    marker = (id(stream), initial_font)
     if marker in visited:
         return
     visited.add(marker)
@@ -142,8 +168,6 @@ def collect_used_fonts(
                 visited,
                 current_font,
             )
-
-    visited.remove(marker)
 
 
 def font_embedding_report(reader: PdfReader) -> tuple[set[str], set[str]]:
@@ -218,7 +242,10 @@ def main() -> int:
         if bad_pages:
             failures.append(f"以下页面不是 A4：{bad_pages}")
 
-    extracted = normalize_text("\n".join(page.extract_text() or "" for page in reader.pages))
+    page_texts = [page.extract_text() for page in reader.pages]
+    text_report = text_extraction_report(page_texts, bool(args.required or args.forbidden))
+    warnings.extend(text_report["warnings"])
+    extracted = text_report["normalized"]
     missing = [text for text in args.required if normalize_text(text) not in extracted]
     forbidden_present = [text for text in args.forbidden if normalize_text(text) in extracted]
     if missing:
@@ -226,7 +253,12 @@ def main() -> int:
     if forbidden_present:
         failures.append(f"发现禁止文字：{forbidden_present}")
 
-    fonts, unembedded_fonts = font_embedding_report(reader)
+    try:
+        fonts, unembedded_fonts = font_embedding_report(reader)
+    except Exception as error:
+        fonts = set()
+        unembedded_fonts = set()
+        failures.append(f"字体检查失败：{error}")
     if not fonts and not unembedded_fonts:
         failures.append("未检测到字体资源")
     if unembedded_fonts:
@@ -252,6 +284,10 @@ def main() -> int:
         "unembedded_fonts": sorted(unembedded_fonts),
         "missing_required": missing,
         "forbidden_present": forbidden_present,
+        "text_extraction": {
+            "characters": text_report["characters"],
+            "pages_without_text": text_report["pages_without_text"],
+        },
         "rendered_files": rendered,
         "render_dir": str(actual_render_dir) if actual_render_dir else None,
         "warnings": warnings,

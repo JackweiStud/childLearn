@@ -7,17 +7,21 @@
 正文与符号使用不同字体。不要假设正文字体中的 `□`、`○` 足够大。
 
 ```python
+import json
+from pathlib import Path
+
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-pdfmetrics.registerFont(TTFont("Exam", "/path/to/chinese-font.ttf"))
-pdfmetrics.registerFont(TTFont("Shape", "/path/to/symbol-font.ttf"))
+font_report = json.loads(Path("work/<卷名或工作名>/font-report.json").read_text(encoding="utf-8"))
+pdfmetrics.registerFont(TTFont("Exam", font_report["cjk"]["path"]))
+pdfmetrics.registerFont(TTFont("Shape", font_report["symbol"]["path"]))
 
 def symbol(char, size=15):
     return f'<font name="Shape" size="{size}">{char}</font>'
 ```
 
-优先嵌入字体。若目标机器没有固定字体路径，先用字体搜索工具定位可用中文字体和符号字体。
+优先嵌入字体。先运行 `scripts/find_font.py --require-exists` 生成 `font-report.json`；如果缺少中文或符号字体，先安装或指定字体目录，不要把 `/path/to/...` 留在生成脚本里。
 
 ## 并排小题
 

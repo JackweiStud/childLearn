@@ -104,6 +104,13 @@ class ValidateExamPdfTests(unittest.TestCase):
         self.assertNotEqual(render_base, run_dir)
         self.assertTrue(stale_file.exists())
 
+    def test_text_extraction_report_warns_when_checks_have_no_text_layer(self) -> None:
+        report = validator.text_extraction_report(["", None], checks_requested=True)
+
+        self.assertEqual("", report["normalized"])
+        self.assertEqual([1, 2], report["pages_without_text"])
+        self.assertIn("无法从 PDF 文本层提取任何文字", report["warnings"][0])
+
     def test_docs_do_not_contain_current_exam_examples(self) -> None:
         content = "\n".join(
             [

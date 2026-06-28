@@ -32,12 +32,31 @@ description: 将已经作答、涂写或批改过的试卷与练习册照片重�
 - 使用 `reportlab` 生成矢量 PDF。
 - 使用 `pypdf` 反向提取文字并检查字体。
 - 使用 Poppler 的 `pdftoppm`、`pdfinfo` 渲染和检查 PDF。
-- 优先调用 Codex 工作区自带的文档运行时；仅在依赖确实缺失时安装最小依赖。
+- 使用 `scripts/run_with_runtime.sh` 调用本 Skill 的 Python 脚本；它会优先使用 Codex 工作区自带 Python，再回退到系统 `python3`。
+- 使用 `scripts/preflight.py` 检查源图尺寸、Poppler、Python 依赖和字体。图片长边低于 2000px 只作为质量警告；依赖、字体、格式等硬缺口才阻塞流程。批量整页高质量重建需要硬控尺寸时，显式加 `--strict-image-size`。
+- 使用 `scripts/find_font.py` 定位中文字体和符号字体，禁止在生成脚本中保留占位字体路径。
 
 ### 1. 建立原始事实
 
 - 统计照片对应的逻辑页数、正反面和页序。
 - 旋转、裁边、透视校正并按单页拆分；保留未经修改的原图作为事实来源。
+- 先执行预检，确认图片尺寸、依赖和字体状态：
+
+```bash
+scripts/run_with_runtime.sh scripts/preflight.py <按页序排列的图片...> --json
+```
+
+预检状态为 `warning` 时可以继续建立内容模型，但必须把警告纳入置信度和待确认判断；不要把低分辨率本身等同于“不能处理”。
+
+- 为每份试卷创建持久中间模型，不要只把识别结果留在对话上下文：
+
+```bash
+scripts/run_with_runtime.sh scripts/create_exam_model.py \
+  --title "<卷名或工作名>" \
+  --output work/<卷名或工作名>/questions.json \
+  <按页序排列的图片...>
+```
+
 - 使用 OCR 提高录入效率，但只把 OCR 当候选文本。
 - 对照原图逐题确认题号、标点、数字、单位、空格、选项和图形。
 - 默认不联网搜索原题，不把反查原卷作为开始重建或交付验收的前置条件。
@@ -58,7 +77,9 @@ description: 将已经作答、涂写或批改过的试卷与练习册照片重�
 │   │   │   └── 答题区
 ```
 
-给每条内容标记来源：原图清晰可见、用户补充确认、可选的原卷核验、上下文推断或待用户确认。前三类可以作为“已确认”内容；上下文推断必须单独标记，不能伪装成原图事实。
+把该结构落入 `questions.json`，字段合同见 [questions.json 中间模型](references/questions-json-schema.md)。给每条内容标记来源：原图清晰可见、用户补充确认、可选的原卷核验、上下文推断或待用户确认。前三类可以作为“已确认”内容；上下文推断必须单独标记，不能伪装成原图事实。
+
+`questions.json` 是断点续作和人工复核的事实层。每次修改题干、选项、图形或待确认项，都先更新 JSON，再更新生成脚本和 PDF。
 
 ### 3. 生成打印稿
 
@@ -83,6 +104,13 @@ description: 将已经作答、涂写或批改过的试卷与练习册照片重�
 
 生成 PDF 时，按需读取 [排版与绘图模式](references/layout-patterns.md)。
 
+生成脚本先保存字体报告：
+
+```bash
+mkdir -p work/<卷名或工作名>
+scripts/run_with_runtime.sh scripts/find_font.py --require-exists > work/<卷名或工作名>/font-report.json
+```
+
 使用统一路径模块确定文件名并自动创建输出目录：
 
 ```python
@@ -94,7 +122,7 @@ OUTPUT_PDF = output_pdf_path("<本卷文件名>.pdf")
 当生成脚本不在 Skill 的 `scripts/` 目录时，先执行以下命令取得路径，不要自行拼接绝对路径：
 
 ```bash
-OUTPUT_PDF="$(python3 scripts/output_paths.py '<本卷文件名>.pdf')"
+OUTPUT_PDF="$(scripts/run_with_runtime.sh scripts/output_paths.py '<本卷文件名>.pdf')"
 ```
 
 ### 4. 执行闭环验收
@@ -119,9 +147,9 @@ OUTPUT_PDF="$(python3 scripts/output_paths.py '<本卷文件名>.pdf')"
 EXPECTED_PAGES="<按本卷实际页数填写>"
 REQUIRED_TEXT="<从本卷选择一条关键题干>"
 FORBIDDEN_TEXT="<本卷中必须移除的学生信息或答案>"
-OUTPUT_PDF="$(python3 scripts/output_paths.py '<本卷文件名>.pdf')"
+OUTPUT_PDF="$(scripts/run_with_runtime.sh scripts/output_paths.py '<本卷文件名>.pdf')"
 
-python3 scripts/validate_exam_pdf.py "$OUTPUT_PDF" \
+scripts/run_with_runtime.sh scripts/validate_exam_pdf.py "$OUTPUT_PDF" \
   --expected-pages "$EXPECTED_PAGES" \
   --required "$REQUIRED_TEXT" \
   --forbidden "$FORBIDDEN_TEXT" \
@@ -129,6 +157,8 @@ python3 scripts/validate_exam_pdf.py "$OUTPUT_PDF" \
 ```
 
 每次根据当前试卷填写变量，禁止沿用上一份试卷的页数、卷名或题干。
+
+如果校验脚本报告文本层提取 warning，不要把 `--forbidden` 未命中当成“答案已移除”的充分证据；必须结合渲染图逐页检查。
 
 交付前完整执行 [验收清单](references/acceptance-checklist.md)。
 
@@ -149,7 +179,7 @@ python3 scripts/validate_exam_pdf.py "$OUTPUT_PDF" \
 材料不足时，一次只提出最关键的补拍要求：
 
 - 一页一张，正上方拍摄，四角完整。
-- 长边建议至少 2000 像素。
+- 长边建议至少 2000 像素；低于该值不是硬阻塞，但会降低置信度，需按可辨认程度决定是否补拍。
 - 避免反光、阴影、折叠和手指遮挡。
 - 对被重度涂写的题目增加局部近照。
 - 按页码顺序提供全部正反面。
@@ -159,7 +189,8 @@ python3 scripts/validate_exam_pdf.py "$OUTPUT_PDF" \
 交付时提供：
 
 1. `outPdfFile/` 中的可打印 PDF。
-2. 页数、纸张尺寸和字体嵌入检查结果。
-3. 已完成的内容与版式验收摘要。
-4. 未解决的歧义清单；若为空，明确写“无待确认项”。
-5. 说明成品是原卷下载、图像清理还是矢量重建，不混淆三种来源。
+2. 对应 `work/<卷名或工作名>/questions.json` 的路径。
+3. 页数、纸张尺寸、字体嵌入和文本层 warning 检查结果。
+4. 已完成的内容与版式验收摘要。
+5. 未解决的歧义清单；若为空，明确写“无待确认项”。
+6. 说明成品是原卷下载、图像清理还是矢量重建，不混淆三种来源。
