@@ -17,17 +17,42 @@
     isDrawingCrop: false     // 是否正在从头开始拖拽绘制一个新的截图框
   };
 
+  // Layout 归一化坐标 → 视觉归一化坐标（CSS rotate 正向变换）
+  // cropBox 等所有内部坐标存在 layout 坐标系（参考点 = 未旋转 canvas 的左上角）；
+  // 要在视觉上定位悬浮 UI（如 crop toolbar）时必须做这个正向旋转再 × 视觉宽高。
+  function layoutToVisualNorm(lx, ly, rotDeg) {
+    if (rotDeg === 90)  return { x: 1 - ly, y: lx };
+    if (rotDeg === 180) return { x: 1 - lx, y: 1 - ly };
+    if (rotDeg === 270) return { x: ly, y: 1 - lx };
+    return { x: lx, y: ly };
+  }
+
   // 显示截图悬浮操作栏
   function showCropToolbar() {
     if (!state.cropBox || !UI.elements.cropActionToolbar) return;
     const canvas = UI.elements.annotationCanvas;
     const rect = canvas.getBoundingClientRect();
-    
-    const x1 = Math.min(state.cropBox.start.x, state.cropBox.end.x) * rect.width;
-    const y1 = Math.min(state.cropBox.start.y, state.cropBox.end.y) * rect.height;
-    const x2 = Math.max(state.cropBox.start.x, state.cropBox.end.x) * rect.width;
-    const y2 = Math.max(state.cropBox.start.y, state.cropBox.end.y) * rect.height;
-    
+    const rot = (window.CameraHandler && window.CameraHandler.state.rotationDeg) || 0;
+
+    // cropBox 是 layout 归一化；toolbar 要在视觉布局上定位，必须先把 4 顶点正向旋转
+    const lx1 = Math.min(state.cropBox.start.x, state.cropBox.end.x);
+    const ly1 = Math.min(state.cropBox.start.y, state.cropBox.end.y);
+    const lx2 = Math.max(state.cropBox.start.x, state.cropBox.end.x);
+    const ly2 = Math.max(state.cropBox.start.y, state.cropBox.end.y);
+
+    const corners = [
+      layoutToVisualNorm(lx1, ly1, rot),
+      layoutToVisualNorm(lx2, ly1, rot),
+      layoutToVisualNorm(lx1, ly2, rot),
+      layoutToVisualNorm(lx2, ly2, rot),
+    ];
+    const vxs = corners.map(c => c.x);
+    const vys = corners.map(c => c.y);
+    const x1 = Math.min(...vxs) * rect.width;
+    const y1 = Math.min(...vys) * rect.height;
+    const x2 = Math.max(...vxs) * rect.width;
+    const y2 = Math.max(...vys) * rect.height;
+
     // 定位在截图框正下方，如果贴底，则显示在正上方
     let top = y2 + 10;
     const toolbarHeight = 45;
@@ -35,14 +60,14 @@
       top = y1 - toolbarHeight - 10;
       if (top < 0) top = 10;
     }
-    
+
     // 水平居中
     const width = x2 - x1;
     const toolbarWidth = 180;
     let left = x1 + width / 2 - toolbarWidth / 2;
     if (left < 10) left = 10;
     if (left + toolbarWidth > rect.width) left = rect.width - toolbarWidth - 10;
-    
+
     UI.elements.cropActionToolbar.style.left = `${left}px`;
     UI.elements.cropActionToolbar.style.top = `${top}px`;
     UI.elements.cropActionToolbar.hidden = false;
@@ -392,15 +417,17 @@
 
     if (state.currentTool === 'crop') {
       if (state.cropBox) {
-        // 计算把手像素位置
-        const rect = canvas.getBoundingClientRect();
-        const clickX = pt.x * rect.width;
-        const clickY = pt.y * rect.height;
-        
-        const x1 = Math.min(state.cropBox.start.x, state.cropBox.end.x) * rect.width;
-        const y1 = Math.min(state.cropBox.start.y, state.cropBox.end.y) * rect.height;
-        const x2 = Math.max(state.cropBox.start.x, state.cropBox.end.x) * rect.width;
-        const y2 = Math.max(state.cropBox.start.y, state.cropBox.end.y) * rect.height;
+        // 把手检测用 layout 坐标系：pt 是 layout 归一化；offsetWidth/Height 是 layout 尺寸
+        // 不能用 getBoundingClientRect().width/height（旋转后是视觉宽高，跟 pt 坐标系不一致 → 把手位置算飞）
+        const layoutW = canvas.offsetWidth;
+        const layoutH = canvas.offsetHeight;
+        const clickX = pt.x * layoutW;
+        const clickY = pt.y * layoutH;
+
+        const x1 = Math.min(state.cropBox.start.x, state.cropBox.end.x) * layoutW;
+        const y1 = Math.min(state.cropBox.start.y, state.cropBox.end.y) * layoutH;
+        const x2 = Math.max(state.cropBox.start.x, state.cropBox.end.x) * layoutW;
+        const y2 = Math.max(state.cropBox.start.y, state.cropBox.end.y) * layoutH;
         const xc = (x1 + x2) / 2;
         const yc = (y1 + y2) / 2;
 
