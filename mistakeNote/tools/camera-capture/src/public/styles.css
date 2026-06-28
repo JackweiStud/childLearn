@@ -1493,6 +1493,30 @@ body {
   object-fit: contain;
 }
 
+/* ===== iPhone 未检测到提示卡片 ===== */
+.iphone-hint {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(232, 116, 74, 0.08);
+  border: 1px solid rgba(232, 116, 74, 0.28);
+  border-left: 3px solid var(--primary-accent, #e8744a);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted, #6b5c50);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.iphone-hint strong {
+  color: var(--text-main, #2a201a);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.iphone-hint[hidden] { display: none !important; }
+
 /* ===== 文字工具选项栏 ===== */
 .text-options-bar {
   position: absolute;

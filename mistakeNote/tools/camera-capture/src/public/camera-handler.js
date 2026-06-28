@@ -18,8 +18,12 @@
   };
 
   // 设备检测及列表填充
-  async function detectDevices() {
-    UI.log('正在检测并刷新摄像头设备列表...');
+  // detectDevices 选项：
+  //   silent=true 不打"正在检测"日志（用于后台静默重扫）
+  // 返回：{ deviceValues: string[], hasIphoneInSystem: boolean, hasIphoneInBrowser: boolean }
+  // 用于上层做"3 秒后自动重扫 + 新设备 toast"
+  async function detectDevices({ silent = false } = {}) {
+    if (!silent) UI.log('正在检测并刷新摄像头设备列表...');
     try {
       // 1. 获取系统诊断摄像头 (AVFoundation)
       let systemDevices = [];
@@ -73,6 +77,8 @@
       }
 
       // 3. 统一归并在下拉选择框中
+      // 重扫前记住用户当前选择，merge 后尽量保留
+      const previousValue = UI.elements.deviceSelect.value || '';
       UI.elements.deviceSelect.innerHTML = '';
       
       // 先添加浏览器常规 WebRTC 设备
@@ -117,29 +123,61 @@
         UI.setStatus('未检测到任何摄像头设备。', 'warn');
         UI.log('【设备发现提示】未找到任何视频设备。如果您想使用 iPhone 摄像头 (Continuity Camera)，请注意：\n1. 手机需处于锁屏、黑屏状态，且横向放置、保持静止（例如放在支架上）。\n2. 若仍不显示，请在 Mac 上打开 FaceTime 或“照片亭(Photo Booth)”应用，在其视频菜单中选中您的 iPhone 激活连接，然后回到此页面点击“刷新设备”。', 'warn');
       } else {
-        // 默认选中策略：如果有外接 USB camera，优先选中；如果有 iPhone 且当前是 native，也作为后备
-        let bestIndex = 0;
-        for (let i = 0; i < UI.elements.deviceSelect.options.length; i++) {
-          const opt = UI.elements.deviceSelect.options[i];
-          if (/usb\s*camera/i.test(opt.textContent)) {
-            bestIndex = i;
-            break;
+        // 选中策略：优先恢复用户之前选过的；否则 USB Camera 优先；否则默认第一项
+        let bestIndex = -1;
+        if (previousValue) {
+          for (let i = 0; i < UI.elements.deviceSelect.options.length; i++) {
+            if (UI.elements.deviceSelect.options[i].value === previousValue) {
+              bestIndex = i;
+              break;
+            }
+          }
+        }
+        if (bestIndex === -1) {
+          bestIndex = 0;
+          for (let i = 0; i < UI.elements.deviceSelect.options.length; i++) {
+            if (/usb\s*camera/i.test(UI.elements.deviceSelect.options[i].textContent)) {
+              bestIndex = i;
+              break;
+            }
           }
         }
         UI.elements.deviceSelect.selectedIndex = bestIndex;
-        
+
         // 提示信息
         const hasUnauthorised = browserDevices.some(d => !d.label);
-        if (hasUnauthorised) {
-          UI.setStatus('检测到未授权设备。请点击“开启摄像头”允许浏览器获取真实名称。', 'normal');
+        if (hasUnauthorised && !silent) {
+          UI.setStatus('检测到未授权设备。请点击"开启摄像头"允许浏览器获取真实名称。', 'normal');
         }
       }
-      
-      UI.log(`已统一摄像头列表：共计 ${UI.elements.deviceSelect.options.length} 个选择`);
+
+      if (!silent) {
+        UI.log(`已统一摄像头列表：共计 ${UI.elements.deviceSelect.options.length} 个选择`);
+      }
       // 根据默认选中设备立即同步分辨率选择器状态
       updateResolutionSelectState();
+
+      // 检测 iPhone 是否出现：浏览器列表 / 系统列表任一看到都算
+      const hasIphoneInBrowser = browserDevices.some(d => /iphone/i.test(d.label || ''));
+      const hasIphoneInSystem = systemDevices.some(d => /iphone/i.test(d.label || ''));
+      const hasIphone = hasIphoneInBrowser || hasIphoneInSystem;
+
+      // 管理 iPhone 未检测提示卡片：扫到 iPhone 就隐藏，没扫到就显示
+      if (UI.elements.iphoneNotDetectedHint) {
+        UI.elements.iphoneNotDetectedHint.hidden = hasIphone;
+      }
+
+      // 返回设备摘要，供上层做"新设备 toast"对比
+      return {
+        deviceValues: Array.from(UI.elements.deviceSelect.options).map(o => o.value),
+        deviceLabels: Array.from(UI.elements.deviceSelect.options).map(o => o.textContent),
+        hasIphone,
+        hasIphoneInSystem,
+        hasIphoneInBrowser,
+      };
     } catch (err) {
       UI.setStatus(`设备检测异常: ${err.message}`, 'error');
+      return { deviceValues: [], deviceLabels: [], hasIphone: false };
     }
   }
 

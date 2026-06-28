@@ -55,6 +55,7 @@
     cameraControlsToggle: document.getElementById('cameraControlsToggle'),
     recentCapturesToggle: document.getElementById('recentCapturesToggle'),
     recentCapturesBody: document.getElementById('recentCapturesBody'),
+    iphoneNotDetectedHint: document.getElementById('iphoneNotDetectedHint'),
   };
 
   // 控制台日志功能

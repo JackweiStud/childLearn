@@ -17,8 +17,24 @@
 
       // 3. 页面初次载入时，默认触发一次摄像头检测
       if (window.CameraHandler) {
-        await window.CameraHandler.detectDevices();
-        UI.setStatus('系统准备就绪。默认不打开摄像头，请选择设备后点击“开启摄像头”开始取景。', 'normal');
+        const firstScan = await window.CameraHandler.detectDevices();
+        UI.setStatus('系统准备就绪。默认不打开摄像头，请选择设备后点击"开启摄像头"开始取景。', 'normal');
+
+        // 方案 A：3 秒后自动静默重扫一次，捕获 macOS 异步注册的 iPhone Continuity Camera
+        // macOS 上 iPhone 通过 BLE 握手注册到 AVFoundation 通常有 1-3 秒延迟，
+        // 首次进页面那一刻经常扫不到，等一会儿再扫就能看到
+        setTimeout(async () => {
+          const secondScan = await window.CameraHandler.detectDevices({ silent: true });
+          const prev = new Set(firstScan.deviceValues || []);
+          const added = (secondScan.deviceValues || []).filter(v => !prev.has(v));
+          if (added.length > 0) {
+            const addedLabels = (secondScan.deviceLabels || [])
+              .filter((_, i) => !prev.has(secondScan.deviceValues[i]))
+              .join('、');
+            UI.log(`后台重扫新发现摄像头：${addedLabels}`);
+            UI.showToast(`新检测到摄像头：${addedLabels}`, 'success');
+          }
+        }, 3000);
       }
 
       // 4. 事件绑定
