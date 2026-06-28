@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { URL } = require('node:url');
 
-const { createCaptureStore } = require('./capture-store.cjs');
+const { createCaptureStore, formatDateDir } = require('./capture-store.cjs');
 
 const repoRoot = process.env.CAMERA_CAPTURE_REPO_ROOT || path.resolve(__dirname, '..', '..', '..');
 const publicDir = path.join(__dirname, 'public');
@@ -137,6 +137,46 @@ async function handleDeleteCapture(req, res) {
     sendJson(res, 200, { success: true, deleted: imageFilePath, deletedCount });
   } catch (error) {
     sendError(res, 400, error.message);
+  }
+}
+
+// 列出"今天"目录下的拍摄记录，按 mtime 倒序，最多 limit 条
+// 只扫今天目录是有意 trade-off：刷新页面 = 看刚拍的，跨零点拍的看不到（接受）
+function handleListCaptures(url, res) {
+  try {
+    const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit')) || 10));
+    const todayDir = path.join(store.scansRoot, formatDateDir(new Date()));
+
+    if (!fs.existsSync(todayDir)) {
+      sendJson(res, 200, { items: [] });
+      return;
+    }
+
+    const items = [];
+    for (const name of fs.readdirSync(todayDir)) {
+      if (!/\.(jpg|jpeg|png)$/i.test(name)) continue;
+      const imagePath = path.join(todayDir, name);
+      const metaPath = path.join(todayDir, `${path.parse(name).name}.json`);
+      const stat = fs.statSync(imagePath);
+
+      let meta = {};
+      if (fs.existsSync(metaPath)) {
+        try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch (_) {}
+      }
+
+      items.push({
+        imagePath,                                              // 绝对路径（给 delete/open-file 用）
+        relativeImagePath: path.relative(repoRoot, imagePath).split(path.sep).join('/'),
+        url: `/scans/${path.relative(store.scansRoot, imagePath).split(path.sep).join('/')}`, // 给 <img src> 用
+        meta,
+        mtime: stat.mtimeMs,
+      });
+    }
+
+    items.sort((a, b) => b.mtime - a.mtime); // 时间倒序，最新在前
+    sendJson(res, 200, { items: items.slice(0, limit) });
+  } catch (error) {
+    sendError(res, 500, error.message);
   }
 }
 
@@ -525,6 +565,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/captures') {
     handleCapture(req, res);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/captures') {
+    handleListCaptures(url, res);
     return;
   }
 
