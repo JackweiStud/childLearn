@@ -160,6 +160,27 @@ scripts/run_with_runtime.sh scripts/validate_exam_pdf.py "$OUTPUT_PDF" \
 
 如果校验脚本报告文本层提取 warning，不要把 `--forbidden` 未命中当成“答案已移除”的充分证据；必须结合渲染图逐页检查。
 
+#### 内容交叉校验（必做，不可省略）
+
+`validate_exam_pdf.py` 只做形式校验（页数、尺寸、字体、文本层），管不到“题目内容对不对”。内容准确性必须靠原图与重建图的逐题视觉对照，不能凭记忆声称“已录对”。每次重建或大改后，生成并排对比图：
+
+```bash
+scripts/run_with_runtime.sh scripts/compare_pages.py \
+  work/<卷名或工作名>/questions.json \
+  --pdf "$OUTPUT_PDF" \
+  --output-dir work/<卷名或工作名>/compare \
+  --json
+```
+
+然后**逐页打开对比图**（左=原图 SOURCE，右=重建图 REBUILT），按题核对：
+
+- 题号、题干文字、数字、单位、标点是否与原图一致。
+- 选项数量、顺序、图形语义是否一致。
+- 是否漏题、串行、把学生答案或批改带入成品。
+- 钟面时间、方格数量、几何轮廓等图形语义是否一致。
+
+发现任何不一致，先回写 `questions.json`（更新题目内容、`confidence` 或 `ambiguities`），再重新生成 PDF 和对比图，直到逐页核对通过。不要跳过对比图直接交付。
+
 交付前完整执行 [验收清单](references/acceptance-checklist.md)。
 
 ## 失败模式

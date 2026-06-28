@@ -149,6 +149,54 @@ class WorkflowToolTests(unittest.TestCase):
         self.assertIn("reportlab", result["missing_python_modules"])
         self.assertGreaterEqual(len(result["issues"]), 3)
 
+    def test_compose_comparison_combines_source_and_rebuilt(self) -> None:
+        module = load_module("compare_pages", SCRIPTS / "compare_pages.py")
+        source = self.root / "src.png"
+        rebuilt = self.root / "rebuilt.png"
+        # 故意用不同尺寸，验证缩放到同高后能横向拼接。
+        write_png(source, 1200, 1600)
+        write_png(rebuilt, 800, 1000)
+        out_path = self.root / "compare" / "compare-page-01.png"
+
+        result = module.compose_comparison(source, rebuilt, out_path, 1)
+
+        self.assertTrue(result.is_file())
+        from PIL import Image
+
+        with Image.open(result) as combined:
+            # 拼接图宽度必须大于任一单页，证明确实左右并排而非覆盖。
+            self.assertGreater(combined.width, 800)
+            self.assertGreater(combined.height, 1000)
+
+    def test_build_comparisons_flags_page_count_mismatch(self) -> None:
+        module = load_module("compare_pages", SCRIPTS / "compare_pages.py")
+        source = self.root / "page-1.png"
+        write_png(source, 1200, 1600)
+        model = {
+            "schema": "rebuild-clean-exam.questions.v1",
+            "pages": [{"page_number": 1, "source_image": {"path": str(source)}}],
+        }
+        questions = self.root / "questions.json"
+        questions.write_text(json.dumps(model), encoding="utf-8")
+        out_dir = self.root / "compare"
+        out_dir.mkdir()
+
+        # 用桩替换 PDF 渲染，制造“PDF 渲染出 2 页”与源图 1 页不符的场景。
+        rebuilt_a = self.root / "rebuilt-1.png"
+        rebuilt_b = self.root / "rebuilt-2.png"
+        write_png(rebuilt_a, 800, 1000)
+        write_png(rebuilt_b, 800, 1000)
+        module.render_pdf_pages = lambda pdf, output_dir, dpi: [rebuilt_a, rebuilt_b]
+        fake_pdf = self.root / "out.pdf"
+        fake_pdf.write_bytes(b"%PDF-1.4")
+
+        result = module.build_comparisons(questions, fake_pdf, out_dir, 120)
+
+        self.assertEqual("失败", result["status"])
+        self.assertEqual(1, result["source_pages"])
+        self.assertEqual(2, result["pdf_pages"])
+        self.assertTrue(any("页数不符" in issue for issue in result["issues"]))
+
 
 if __name__ == "__main__":
     unittest.main()
