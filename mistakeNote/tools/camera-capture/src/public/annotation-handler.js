@@ -304,19 +304,47 @@
     render();
   }
 
-  // 坐标归一化转换（当画布有 CSS 旋转时，将视觉坐标逆变换回逻辑坐标）
+  // 坐标归一化转换
+  // 关键：getBoundingClientRect 在 CSS rotate 后返回的是"视觉包围盒"，宽高会被交换；
+  // 必须先把视觉坐标逆旋转回 layout 坐标系（参考点 = 未旋转 canvas 的左上角），
+  // 再用 offsetWidth/offsetHeight（layout 尺寸）做归一化，否则非正方形画布旋转后
+  // 归一化会因为视觉宽高比变化而畸变。
   function getNormalizedPoint(event) {
     const canvas = UI.elements.annotationCanvas;
     const rect = canvas.getBoundingClientRect();
-    let vx = (event.clientX - rect.left) / rect.width;
-    let vy = (event.clientY - rect.top) / rect.height;
-
     const rot = (window.CameraHandler && window.CameraHandler.state.rotationDeg) || 0;
-    if (rot === 90)       { const t = vx; vx = 1 - vy; vy = t; }
-    else if (rot === 180) { vx = 1 - vx; vy = 1 - vy; }
-    else if (rot === 270) { const t = vx; vx = vy; vy = 1 - t; }
 
-    return { x: vx, y: vy };
+    // 视觉坐标（相对视觉包围盒左上角）
+    const visX = event.clientX - rect.left;
+    const visY = event.clientY - rect.top;
+
+    // layout 尺寸（不受 CSS transform 影响，等于未旋转 canvas 的真实宽高）
+    const lw = canvas.offsetWidth;
+    const lh = canvas.offsetHeight;
+
+    // 视觉宽高（旋转 90/270 时与 layout 宽高互换）
+    const vw = rect.width;
+    const vh = rect.height;
+
+    // 把视觉坐标逆旋转回 layout 坐标
+    let layoutX, layoutY;
+    if (rot === 90) {
+      // 视觉 (visX, visY) 对应 layout (visY, vw - visX)，且 vw = lh
+      layoutX = visY;
+      layoutY = vw - visX;
+    } else if (rot === 180) {
+      layoutX = vw - visX;
+      layoutY = vh - visY;
+    } else if (rot === 270) {
+      // 视觉 (visX, visY) 对应 layout (vh - visY, visX)，且 vh = lw
+      layoutX = vh - visY;
+      layoutY = visX;
+    } else {
+      layoutX = visX;
+      layoutY = visY;
+    }
+
+    return { x: layoutX / lw, y: layoutY / lh };
   }
 
   // 指针按下开始绘制
