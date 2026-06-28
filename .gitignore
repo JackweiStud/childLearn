@@ -9,8 +9,9 @@
 # 依赖
 node_modules/
 
-# rebuild-clean-exam skill 的输出目录
+# rebuild-clean-exam skill 的输出目录与工作目录
 tools/rebuild-clean-exam/outPdfFile/
+tools/rebuild-clean-exam/work/
 
 # 错题临时区:孩子作业拍照、Claude 生成的中间产物暂存,归档完成后清空
 # 任何路径下的 temp/ 都不入库,文件就是中间态,不该有 git 历史
@@ -20,9 +21,18 @@ mistakeNote/**/temp/
 mistakeNote/_inbox/scans/
 mistakeNote/_inbox/crops/
 
+# camera-capture 独立运行时的默认输出目录（裸跑时用，不入库）
+tools/camera-capture/captures/
+
 # Playwright MCP 本地验证产物
 mistakeNote/.playwright-mcp/
 
 # Claude Code 本地 permissions(个人设备配置,不跨设备共享)
 # slash command(.claude/commands/)入库;settings.local 不入库
 **/.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+

@@ -4,21 +4,35 @@
 
 ---
 
-## 一、在 childLearn 中的位置
+## 一、在 childLearn 中的位置 + 独立工具定位
 
-camera-capture 位于 `childLearn/tools/camera-capture/`，是**与领域无关的通用采集工具**：默认服务 mistakeNote（错题），但通过 `CAMERA_CAPTURE_PROJECT_ROOT` 环境变量可复用到 englishNote / readingNote 等未来领域，**无需改代码**。
+camera-capture 位于 `childLearn/tools/camera-capture/`，**完全独立**，不假设任何"项目结构"：
 
-当前服务 mistakeNote 时的位置：
+- **默认输出**：`tools/camera-capture/captures/YYYY-MM-DD/`（工具自包含，搬到哪儿在哪儿出）
+- **接入项目**：通过环境变量 `CAMERA_CAPTURE_OUTPUT_DIR` 指定目标目录
+- **URL 路由**：`/captures/<相对路径>` 访问已保存图，`GET /api/captures?limit=N` 列今天文件
+
+### 当前服务 mistakeNote 的接入方式
+
+```bash
+bash mistakeNote/拍照.sh
+```
+
+这个 `拍照.sh` 包装脚本设 `CAMERA_CAPTURE_OUTPUT_DIR=mistakeNote/_inbox/scans/` 后调本工具。结果：
 
 ```
 孩子做错题 → [拍照采集] → 识别/切题 → 归档到错题库 → 生成复习卷 → 孩子重做
               ▲
-              本工具
+              本工具（输出到 mistakeNote/_inbox/scans/）
 ```
 
 camera-capture 是错题管线的**第一环**——把纸上的试卷变成数字文件。它的下游是识别、裁剪、归档，最终产出物是给孩子做的复习卷。
 
 **这个工具成功的标志**：家长拿到孩子批改完的试卷后，30 秒内完成拍照并存入系统，不需要任何额外操作。
+
+### 未来扩展
+
+新领域（如 `englishNote`）只需自己写个 5 行包装脚本设 `CAMERA_CAPTURE_OUTPUT_DIR`，**工具代码零改动**。
 
 ---
 

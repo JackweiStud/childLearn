@@ -29,7 +29,7 @@
 | **camera-capture** | ✅ 1.0 收工 | `tools/camera-capture/` | 双通道（USB + iPhone Continuity）、4K、标注全套、刷新保留、自动重扫、iPhone 提示卡 |
 | **rebuild-clean-exam** | ✅ 已完成 | `tools/rebuild-clean-exam/` | skill，把孩子作答/批改过的试卷照片重建成干净 PDF |
 
-两个工具都默认服务 mistakeNote，但都跨领域设计——未来加 englishNote 等领域时**不需要改工具代码**，通过参数/环境变量复用。
+两个工具都**完全独立**于领域：camera-capture 默认输出 `tools/camera-capture/captures/`，给 mistakeNote 用就跑 `mistakeNote/拍照.sh`（包装脚本设 `CAMERA_CAPTURE_OUTPUT_DIR`）。未来加 englishNote 等领域，各自写 5 行套壳即可，**工具代码零改动**。
 
 ---
 

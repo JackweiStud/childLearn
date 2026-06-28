@@ -8,11 +8,11 @@ const { URL } = require('node:url');
 
 const { createCaptureStore, formatDateDir } = require('./capture-store.cjs');
 
-// projectRoot = 数据归属的项目目录（含 _inbox/scans/）
-// 默认 childLearn/mistakeNote/；其他领域用 CAMERA_CAPTURE_PROJECT_ROOT 覆盖
-const projectRoot = process.env.CAMERA_CAPTURE_PROJECT_ROOT || path.resolve(__dirname, '..', '..', '..', 'mistakeNote');
+// outputDir = 拍照输出绝对路径。工具独立运行，不假设项目结构。
+// 默认 tools/camera-capture/captures/；调用方（如 mistakeNote）通过 CAMERA_CAPTURE_OUTPUT_DIR 接入自己的目录
+const outputDir = process.env.CAMERA_CAPTURE_OUTPUT_DIR || path.resolve(__dirname, '..', 'captures');
 const publicDir = path.join(__dirname, 'public');
-const store = createCaptureStore({ projectRoot });
+const store = createCaptureStore({ outputDir });
 const port = Number(process.env.PORT || 8731);
 const nativePreviewSessions = new Map();
 
@@ -106,7 +106,7 @@ async function handleCapture(req, res) {
     sendJson(res, 201, {
       imagePath: result.relativeImagePath,
       metaPath: result.relativeMetaPath,
-      imageUrl: `/scans/${result.relativeImagePath.replace(/^_inbox\/scans\//, '')}`,
+      imageUrl: `/captures/${result.relativeImagePath}`,
       meta: result.meta,
     });
   } catch (error) {
@@ -117,8 +117,8 @@ async function handleCapture(req, res) {
 async function handleDeleteCapture(req, res) {
   try {
     const body = JSON.parse(await readRequestBody(req, 1024 * 1024));
-    const imageFilePath = safeJoin(projectRoot, body.filePath);
-    if (!imageFilePath || !imageFilePath.startsWith(store.scansRoot)) {
+    const imageFilePath = safeJoin(outputDir, body.filePath);
+    if (!imageFilePath || !imageFilePath.startsWith(store.outputDir)) {
       sendError(res, 400, 'Invalid file path or permission denied');
       return;
     }
@@ -147,7 +147,7 @@ async function handleDeleteCapture(req, res) {
 function handleListCaptures(url, res) {
   try {
     const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit')) || 10));
-    const todayDir = path.join(store.scansRoot, formatDateDir(new Date()));
+    const todayDir = path.join(store.outputDir, formatDateDir(new Date()));
 
     if (!fs.existsSync(todayDir)) {
       sendJson(res, 200, { items: [] });
@@ -168,8 +168,8 @@ function handleListCaptures(url, res) {
 
       items.push({
         imagePath,                                              // 绝对路径（给 delete/open-file 用）
-        relativeImagePath: path.relative(projectRoot, imagePath).split(path.sep).join('/'),
-        url: `/scans/${path.relative(store.scansRoot, imagePath).split(path.sep).join('/')}`, // 给 <img src> 用
+        relativeImagePath: path.relative(outputDir,imagePath).split(path.sep).join('/'),
+        url: `/captures/${path.relative(store.outputDir, imagePath).split(path.sep).join('/')}`, // 给 <img src> 用
         meta,
         mtime: stat.mtimeMs,
       });
@@ -183,18 +183,18 @@ function handleListCaptures(url, res) {
 }
 
 function handleOpenScans(res) {
-  fs.mkdirSync(store.scansRoot, { recursive: true });
-  childProcess.spawn('open', [store.scansRoot], {
+  fs.mkdirSync(store.outputDir, { recursive: true });
+  childProcess.spawn('open', [store.outputDir], {
     detached: true,
     stdio: 'ignore',
   }).unref();
-  sendJson(res, 200, { opened: store.scansRoot });
+  sendJson(res, 200, { opened: store.outputDir });
 }
 
 async function handleOpenFile(req, res) {
   try {
     const body = JSON.parse(await readRequestBody(req, 1024 * 1024));
-    const filePath = safeJoin(projectRoot, body.filePath);
+    const filePath = safeJoin(outputDir, body.filePath);
     if (!filePath || !fs.existsSync(filePath)) {
       sendError(res, 404, 'File not found or invalid path');
       return;
@@ -416,7 +416,7 @@ async function handleNativeCapture(req, res) {
     sendJson(res, 201, {
       imagePath: result.relativeImagePath,
       metaPath: result.relativeMetaPath,
-      imageUrl: `/scans/${result.relativeImagePath.replace(/^_inbox\/scans\//, '')}`,
+      imageUrl: `/captures/${result.relativeImagePath}`,
       meta: result.meta,
     });
   } catch (error) {
@@ -620,8 +620,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === 'GET' && url.pathname.startsWith('/scans/')) {
-    const filePath = safeJoin(store.scansRoot, url.pathname.replace(/^\/scans\//, ''));
+  if (req.method === 'GET' && url.pathname.startsWith('/captures/')) {
+    const filePath = safeJoin(store.outputDir, url.pathname.replace(/^\/captures\//, ''));
     if (!filePath) {
       sendError(res, 400, 'Invalid path');
       return;
@@ -647,8 +647,8 @@ const server = http.createServer((req, res) => {
 if (require.main === module) {
   server.listen(port, '127.0.0.1', () => {
     const url = `http://localhost:${port}`;
-    console.log(`错题拍照台已启动: ${url}`);
-    console.log(`保存目录: ${store.scansRoot}`);
+    console.log(`拍照台已启动: ${url}`);
+    console.log(`输出目录: ${store.outputDir}`);
     childProcess.spawn('open', [url], {
       detached: true,
       stdio: 'ignore',

@@ -58,12 +58,10 @@ function nextSequence(dir, timestamp, slug, extension) {
   return max + 1;
 }
 
-// projectRoot = 数据归属的项目目录（包含 _inbox/scans/）。
-// 默认指向 childLearn/mistakeNote/，将来若 englishNote/readingNote 等其他领域复用本工具，
-// 通过环境变量 CAMERA_CAPTURE_PROJECT_ROOT 指向那个领域的根即可。
-function createCaptureStore({ projectRoot = path.resolve(__dirname, '..', '..', '..', 'mistakeNote'), now = () => new Date() } = {}) {
-  const scansRoot = path.join(projectRoot, '_inbox', 'scans');
-
+// outputDir = 拍照输出的绝对路径。工具完全独立，不假设任何"项目结构"。
+// 默认：tools/camera-capture/captures/（工具自包含，搬到哪儿在哪儿出）
+// 调用方（如 mistakeNote）想接入自己的目录，通过 CAMERA_CAPTURE_OUTPUT_DIR 指定。
+function createCaptureStore({ outputDir = path.resolve(__dirname, '..', 'captures'), now = () => new Date() } = {}) {
   async function saveCapture({ imageBuffer, mimeType, deviceLabel = 'Unknown Camera', width, height, quality = {}, subject = 'math', difficulty = 'none', notes = '' }) {
     if (!Buffer.isBuffer(imageBuffer) || imageBuffer.length === 0) {
       throw new Error('imageBuffer must be a non-empty Buffer');
@@ -77,7 +75,7 @@ function createCaptureStore({ projectRoot = path.resolve(__dirname, '..', '..', 
     const timestamp = formatTimestamp(capturedAt);
     const slug = sourceSlug(deviceLabel);
     const extension = extensionFromMime(mimeType);
-    const targetDir = path.join(scansRoot, dateDir);
+    const targetDir = path.join(outputDir, dateDir);
     fs.mkdirSync(targetDir, { recursive: true });
 
     const sequence = nextSequence(targetDir, timestamp, slug, extension);
@@ -104,14 +102,15 @@ function createCaptureStore({ projectRoot = path.resolve(__dirname, '..', '..', 
     return {
       imagePath,
       metaPath,
-      relativeImagePath: path.relative(projectRoot, imagePath).split(path.sep).join('/'),
-      relativeMetaPath: path.relative(projectRoot, metaPath).split(path.sep).join('/'),
+      // relativePath 相对 outputDir，便于前端拼 URL：/captures/<relativePath>
+      relativeImagePath: path.relative(outputDir, imagePath).split(path.sep).join('/'),
+      relativeMetaPath: path.relative(outputDir, metaPath).split(path.sep).join('/'),
       meta,
     };
   }
 
   return {
-    scansRoot,
+    outputDir,
     saveCapture,
   };
 }

@@ -25,7 +25,7 @@ childLearn/                       ← Git 根 + Obsidian vault 根
         └── 二年级/数学/           # 错题归档
 ```
 
-**`tools/` 与领域解耦**：camera-capture 默认服务 mistakeNote，将来扩展英语 / 阅读等新领域时，通过环境变量复用同一份工具代码，不重复造轮子。
+**`tools/` 与领域完全解耦**：camera-capture 默认输出到工具自己旁边的 `captures/`，给 mistakeNote 用就跑 `mistakeNote/拍照.sh`（包装脚本设 `CAMERA_CAPTURE_OUTPUT_DIR`）。新增 englishNote / readingNote 等领域时各自写 5 行套壳即可，工具代码零改动。
 
 ---
 

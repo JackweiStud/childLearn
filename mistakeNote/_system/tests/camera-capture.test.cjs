@@ -17,7 +17,7 @@ test('保存 USB 摄像头抓拍为按日期分类的 JPG 和同名 JSON 元数�
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mistake-camera-'));
   const fixedDate = new Date('2026-06-24T13:05:01.000Z');
   const store = createCaptureStore({
-    projectRoot: rootDir,
+    outputDir: rootDir,
     now: () => fixedDate,
   });
 
@@ -37,8 +37,9 @@ test('保存 USB 摄像头抓拍为按日期分类的 JPG 和同名 JSON 元数�
     notes: 'Unit test preset note',
   });
 
-  assert.equal(result.relativeImagePath, '_inbox/scans/2026-06-24/20260624-210501-usb-camera-001.jpg');
-  assert.equal(result.relativeMetaPath, '_inbox/scans/2026-06-24/20260624-210501-usb-camera-001.json');
+  // relativePath 现在直接相对 outputDir，不再有 mistakeNote 私有的 _inbox/scans/ 层
+  assert.equal(result.relativeImagePath, '2026-06-24/20260624-210501-usb-camera-001.jpg');
+  assert.equal(result.relativeMetaPath, '2026-06-24/20260624-210501-usb-camera-001.json');
   assert.equal(fs.readFileSync(result.imagePath).toString('hex'), jpegBytes.toString('hex'));
 
   const meta = JSON.parse(fs.readFileSync(result.metaPath, 'utf8'));

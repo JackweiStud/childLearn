@@ -1,40 +1,49 @@
-# 拍照台（通用采集工具）
+# 拍照台（独立采集工具）
 
-把纸质试卷/作业拍下来，存到 `<某项目>/_inbox/scans/YYYY-MM-DD/`。
+把纸质试卷/作业拍下来，按日期归档为 JPG + JSON 配对文件。
 
-**默认服务对象：mistakeNote（错题）。** 其他领域（如未来的 englishNote / readingNote）可通过环境变量复用，**不需要改代码**——见下方"跨领域复用"。
-
-下游的识别 / 切题 / 归档 / 复习卷暂不在本工具范围内，详见 state.md。
+**完全独立**：工具不假设任何"项目结构"，默认输出到工具自己旁边的 `captures/` 目录。调用方按需通过环境变量接入自己的目录。
 
 ## 启动
+
+### 裸跑（默认输出到 `tools/camera-capture/captures/`）
 
 ```bash
 cd /Users/jackwl/Code/childLearn/tools/camera-capture
 npm run camera
+# 或
+bash start.sh
 ```
 
-默认打开：`http://localhost:8731`，输出默认到 `childLearn/mistakeNote/_inbox/scans/YYYY-MM-DD/`。
+默认打开：`http://localhost:8731`，输出到工具旁边的 `captures/YYYY-MM-DD/`。
 
-浏览器第一次访问时会请求摄像头权限。允许后，页面会优先选择名称包含 `USB Camera` 的设备。
+### 给某个项目用（指定输出目录）
 
-## 跨领域复用
-
-启动前设环境变量 `CAMERA_CAPTURE_PROJECT_ROOT` 指向另一个项目根，拍照就会写到那个项目的 `_inbox/scans/`：
+启动前 export 环境变量 `CAMERA_CAPTURE_OUTPUT_DIR` 指向目标绝对路径：
 
 ```bash
-# 例：服务"英语笔记"领域
-CAMERA_CAPTURE_PROJECT_ROOT=/Users/jackwl/Code/childLearn/englishNote npm run camera
+# 例：给 mistakeNote 用（写到错题归档入口）
+CAMERA_CAPTURE_OUTPUT_DIR=/Users/jackwl/Code/childLearn/mistakeNote/_inbox/scans \
+  npm run camera
 ```
 
-只要目标项目根下存在 `_inbox/scans/` 结构（不存在会自动创建），就能用。
+`mistakeNote` 提供了开箱即用的包装脚本：
+
+```bash
+bash /Users/jackwl/Code/childLearn/mistakeNote/拍照.sh
+```
+
+未来 `englishNote` / `readingNote` 等领域同理——各自写个 `拍照.sh` 套壳即可，工具代码零改动。
+
+浏览器第一次访问会请求摄像头权限。允许后，页面优先选名称含 `USB Camera` 的设备。
 
 ## 输出格式
 
 每次拍照生成两份配对文件：
 
 ```text
-_inbox/scans/YYYY-MM-DD/YYYYMMDD-HHMMSS-usb-camera-001.jpg   ← 原始图（含标注）
-_inbox/scans/YYYY-MM-DD/YYYYMMDD-HHMMSS-usb-camera-001.json  ← 元数据
+<outputDir>/YYYY-MM-DD/YYYYMMDD-HHMMSS-usb-camera-001.jpg   ← 原始图（含标注）
+<outputDir>/YYYY-MM-DD/YYYYMMDD-HHMMSS-usb-camera-001.json  ← 元数据
 ```
 
 元数据 JSON 里 `status: 'unprocessed'` 表示还没被下游消费。下游处理完后应更新此字段。
