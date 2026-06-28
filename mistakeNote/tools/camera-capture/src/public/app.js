@@ -153,9 +153,10 @@
     }
 
     // 全屏状态改变时重绘 canvas 并校准像素尺寸
+    // requestAnimationFrame 等全屏 reflow 完成后再取尺寸，避免时序竞争
     document.addEventListener('fullscreenchange', () => {
       if (window.AnnotationHandler) {
-        window.AnnotationHandler.resizeCanvas();
+        requestAnimationFrame(() => window.AnnotationHandler.resizeCanvas());
       }
     });
 

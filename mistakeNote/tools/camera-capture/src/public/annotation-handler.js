@@ -289,12 +289,14 @@
   function resizeCanvas() {
     const canvas = UI.elements.annotationCanvas;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
     const ratio = window.devicePixelRatio || 1;
-    
-    const width = Math.max(1, Math.round(rect.width * ratio));
-    const height = Math.max(1, Math.round(rect.height * ratio));
-    
+
+    // 必须用 offsetWidth/offsetHeight（layout 尺寸），不能用 getBoundingClientRect()
+    // CSS rotate 后 getBoundingClientRect 的 width/height 会被交换，导致 pixel buffer
+    // 宽高与 CSS 盒子不一致，所有标注坐标全部偏移
+    const width = Math.max(1, Math.round(canvas.offsetWidth * ratio));
+    const height = Math.max(1, Math.round(canvas.offsetHeight * ratio));
+
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
