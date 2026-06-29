@@ -102,6 +102,55 @@
   - **重做错题**(我打开孩子模式,他重做一遍)
 - 他不接触 Obsidian、不接触 web 项目、不接触 Claude 对话
 
+### 家长日常使用三步
+
+这不是全自动归档系统。现阶段正确方式是"工具采集 + Claude/Codex 半自动归档 + 家长确认错点"。
+
+#### 第一步:拍照 / 截图
+
+纸质作业或试卷用拍照台:
+
+```bash
+cd /Users/jackwl/Code/childLearn
+bash mistakeNote/拍照.sh
+```
+
+浏览器打开后拍整页,或用区域截图工具框出单题。文件会进入:
+
+```text
+mistakeNote/_inbox/scans/YYYY-MM-DD/
+```
+
+如果素材已经来自微信、相册或系统截图,也可以直接保存到本地,后续放进 `temp/`。
+
+#### 第二步:生成干净 PDF
+
+如果原图清楚、没有涂写遮挡,这一步可以跳过。
+
+如果原题有学生答案、批改、圈画或倾斜,用 `rebuild-clean-exam` 走干净试卷重建流程。注意:干净 PDF 不是简单擦图,而是 AI/人工确认题目事实后用 ReportLab 矢量重建;非 AI 彩色擦除实验已回退,不要把它当默认方案。
+
+输出默认在:
+
+```text
+tools/rebuild-clean-exam/outPdfFile/
+```
+
+#### 第三步:归档错题
+
+把第一步的原题图、第二步生成的干净题 PDF(如果有)、孩子草稿图(如果有)放进:
+
+```text
+/Users/jackwl/Code/childLearn/mistakeNote/二年级/数学/temp/
+```
+
+然后在 Claude/Codex 里说:
+
+```text
+/新错题 题目简称
+```
+
+归档命令会按闸门继续:先列素材让家长确认,再强制询问孩子真实错点,最后生成 `note.md`、`variations.md` 和 `打开.html`。孩子真实错点必须由家长口述,不能让模型猜。
+
 ### 1–2 年后(三、四年级)
 
 - 他能自己打开 web 项目的"孩子模式"
