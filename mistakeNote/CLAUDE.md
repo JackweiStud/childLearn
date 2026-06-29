@@ -121,7 +121,7 @@ date: 2026-06-19
 grade: 二年级
 subject: 数学
 source: "学校试卷 第 6 题"
-topics: [应用题, 和差问题]
+tags: [应用题, 和差问题]  # Obsidian 标准 tag 字段,自动出现在 tag pane / 图谱着色
 difficulty: 难
 status: 已掌握            # 未懂 / 讲过 / 已掌握 / 已遗忘
 learned_at: 2026-06-19    # 真正学会的日期,掌握前留空
