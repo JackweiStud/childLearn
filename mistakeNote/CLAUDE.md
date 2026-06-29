@@ -60,7 +60,8 @@
    - **复杂题一次成型可能不够好,正常**:家长看不顺就指出,Claude 迭代到位,不要因为"怕做不好"就退化成静态图
    - 参考样板:邮票题(React 线段图 ~174K)、日历题(vanilla 日历网格 ~30K)
 5. **新建错题文件夹**:`mistakeNote/二年级/数学/错题/YYYY-MM-DD-题目简称/`
-   - `note.md`(按 `_system/模板/错题模板.md` 填)
+   - `<题目简称>.md`(按 `_system/模板/错题模板.md` 填,文件名 = 文件夹的题目简称部分)
+   - `<题目简称>·变形.md`(3 道变形题)
    - `原题.png`、`干净版.pdf`、`打开.html`
 6. **给孩子讲**:让他点开 `打开.html`,自己走一遍
 7. **填 frontmatter 状态**:`未懂` / `讲过` / `已掌握`;设 `next_review`(+3 天)
@@ -82,7 +83,7 @@
   - 主组件:`function XxxLesson() { ... }`(去掉 `export default`)
   - JSX 用 classic runtime 预编译,最终 HTML 里不应出现 `type="text/babel"`
   - 末尾:`ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(XxxLesson));`
-- **.jsx 可选保留**:如果想留 jsx 源码给 Claude 后续修改用,放同一文件夹叫 `互动版.jsx`,note.md 里链上。但**孩子入口永远是 .html**
+- **.jsx 可选保留**:如果想留 jsx 源码给 Claude 后续修改用,放同一文件夹叫 `互动版.jsx`,`<题目简称>.md` 里链上。但**孩子入口永远是 .html**
 - **不做工程化**:不引 Vite、不写 package.json、不装 node_modules。一切退化到单文件 html
 - **回归测试**:`_system/tests/` 下的测试断言"无外部 src、无 `type=text/babel`、内联 JS 无语法错误"——三条对 vanilla 和 React 都适用。新题互动版**建议**(非强制)补对应的 loading 测试。
 
@@ -111,7 +112,7 @@ grep -rE 'next_review: 2026-' mistakeNote/二年级/数学/错题/ | grep -v "ne
 
 ---
 
-## Frontmatter Schema(错题 note.md)
+## Frontmatter Schema(错题 `<题目简称>.md`)
 
 ```yaml
 ---
@@ -150,10 +151,12 @@ has_interactive: true
 - 全部内容中文,文件夹、文件名也用中文(可读性优先)
 - 错题文件夹 slug:`YYYY-MM-DD-题目简称`
 - `[[wikilink]]` 的文本必须**精确等于**目标文件名(不带 `.md`),否则 Obsidian 链接会断
-- 同一道错题文件夹内文件名约定:
-  - **必有**:`note.md`、`原题.png`、`xxx.html`
-  - **建议有**(已成事实标准):`variations.md`(3 道变形 + 家长答案)
+- 同一道错题文件夹内文件名约定(从 2026-06-29 起):
+  - **必有**:`<题目简称>.md`、`<题目简称>·变形.md`、`原题.png`、`打开.html`
+  - 文件名 = 文件夹名去掉 `YYYY-MM-DD-` 前缀。例:`2026-06-19-邮票一样多/邮票一样多.md`、`2026-06-19-邮票一样多/邮票一样多·变形.md`
   - **可选**:`干净版.pdf`(原题截图清晰就免)、`思路.png` / `思路2.png`(孩子草稿照片,家长区证据)、`互动版.jsx`(留给 Claude 改用的 jsx 源码)
+  - **历史遗留**:2026-06-29 之前的题用 `note.md` / `variations.md`,已统一迁移完毕。新题不再用这两个文件名。
+  - **理由**:Obsidian 图谱节点 id = 文件名,题目名作文件名才能直观看出节点是哪道题
 
 ---
 
