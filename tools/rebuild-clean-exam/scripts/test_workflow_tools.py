@@ -73,20 +73,69 @@ class WorkflowToolTests(unittest.TestCase):
         self.assertEqual([], page["questions"])
         self.assertEqual([], saved["ambiguities"])
 
+    def test_validate_model_requires_question_source_and_confidence(self) -> None:
+        module = load_module("exam_model", SCRIPTS / "exam_model.py")
+        image = self.root / "page-1.png"
+        write_png(image, 2400, 1800)
+        model = module.create_model([image], title="标记测试卷")
+
+        # 合法题：通过。
+        model["pages"][0]["questions"] = [
+            {"id": "1", "text": "32 + 45 =", "source": "image_clear", "confidence": "high"}
+        ]
+        self.assertEqual([], module.validate_model(model))
+
+        # 缺 source/confidence：报错。
+        model["pages"][0]["questions"] = [{"id": "1", "text": "32 + 45 ="}]
+        issues = module.validate_model(model)
+        self.assertTrue(any("source 非法" in i for i in issues))
+        self.assertTrue(any("confidence 非法" in i for i in issues))
+
+        # context_inferred 缺 notes：报错。
+        model["pages"][0]["questions"] = [
+            {"id": "1", "text": "x", "source": "context_inferred", "confidence": "low", "notes": []}
+        ]
+        issues = module.validate_model(model)
+        self.assertTrue(any("notes 为空" in i for i in issues))
+
+    def test_create_model_skeleton_has_no_questions_and_passes(self) -> None:
+        # 空骨架（questions=[]）不应被题级校验误伤。
+        module = load_module("exam_model", SCRIPTS / "exam_model.py")
+        image = self.root / "page-1.png"
+        write_png(image, 2400, 1800)
+        model = module.create_model([image], title="骨架卷")
+        self.assertEqual([], module.validate_model(model))
+
     def test_find_font_returns_best_available_candidates(self) -> None:
+        # 新语义：自检通过优先；fake 字体不该被选中，应该 fallback 到系统真字体。
         font_dir = self.root / "fonts"
         font_dir.mkdir()
         cjk = font_dir / "NotoSansCJK-Regular.ttc"
         symbol = font_dir / "Arial Unicode.ttf"
-        cjk.write_bytes(b"fake")
+        cjk.write_bytes(b"fake")  # magic 不对，_is_valid_font_file 直接拒
         symbol.write_bytes(b"fake")
         module = load_module("find_font", SCRIPTS / "find_font.py")
 
         result = module.find_fonts(extra_roots=[font_dir], require_exists=True)
 
-        self.assertEqual(str(cjk), result["cjk"]["path"])
-        self.assertEqual(str(symbol), result["symbol"]["path"])
+        # 必须找到字体（fake 被拒后从系统字体里挑能用的）
+        self.assertIsNotNone(result["cjk"]["path"], "未找到任何 CJK 字体")
+        self.assertIsNotNone(result["symbol"]["path"], "未找到任何 symbol 字体")
         self.assertEqual([], result["missing"])
+        # 必须带 subfontIndex（.ttc 集合必需）+ verified（自检结果）
+        self.assertIn("index", result["cjk"])
+        self.assertEqual(0, result["cjk"]["index"])
+        self.assertIn("verified", result["cjk"])
+
+    def test_find_font_rejects_fake_files_via_magic_check(self) -> None:
+        # PIL fallback bug 回归测试：4 字节 'fake' magic 不在 TTF/OTF/TTC 白名单
+        # → _is_valid_font_file False → _verify_render 不进 PIL，
+        # PIL 也就没机会偷偷 fallback 到 /Library/Fonts/<同名> 系统字体
+        module = load_module("find_font", SCRIPTS / "find_font.py")
+        bad = self.root / "Arial Unicode.ttf"
+        bad.write_bytes(b"fake")
+        self.assertFalse(module._is_valid_font_file(str(bad)))
+        self.assertFalse(module._verify_render(str(bad), 0, "题"))
 
     def test_preflight_warns_for_small_images_without_failing(self) -> None:
         image = self.root / "small.png"

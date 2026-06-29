@@ -14,6 +14,18 @@ from image_utils import probe_image
 
 SCHEMA = "rebuild-clean-exam.questions.v1"
 
+# 题级来源与置信度的合法取值，与 questions-json-schema.md 保持一致。
+# 强校验题级标记，防止生成出"无来源标记却校验通过"的 questions.json，
+# 否则中间层"可审计"承诺形同虚设。
+VALID_SOURCES = {
+    "image_clear",
+    "user_confirmed",
+    "original_exam_verified",
+    "context_inferred",
+    "needs_user_confirmation",
+}
+VALID_CONFIDENCE = {"high", "medium", "low", "pending"}
+
 
 def create_model(image_paths: list[Path], title: str, output: Path | None = None) -> dict[str, Any]:
     if not image_paths:
@@ -51,6 +63,32 @@ def create_model(image_paths: list[Path], title: str, output: Path | None = None
     return model
 
 
+def _validate_questions(page_number: int, questions: list[Any]) -> list[str]:
+    """校验每道题带合法来源与置信度标记；空题列表（未转写骨架）直接放行。"""
+    issues: list[str] = []
+    for position, question in enumerate(questions, 1):
+        where = f"第 {page_number} 页第 {position} 题"
+        if not isinstance(question, dict):
+            issues.append(f"{where} 必须是对象")
+            continue
+        if not str(question.get("id", "")).strip():
+            issues.append(f"{where} 缺少 id")
+        if not str(question.get("text", "")).strip():
+            issues.append(f"{where} 缺少 text")
+        source = question.get("source")
+        if source not in VALID_SOURCES:
+            issues.append(f"{where} source 非法（{source!r}），必须是 {sorted(VALID_SOURCES)}")
+        confidence = question.get("confidence")
+        if confidence not in VALID_CONFIDENCE:
+            issues.append(f"{where} confidence 非法（{confidence!r}），必须是 {sorted(VALID_CONFIDENCE)}")
+        # 上下文推断必须在 notes 留证据，禁止把推断伪装成原图事实。
+        if source == "context_inferred":
+            notes = question.get("notes")
+            if not isinstance(notes, list) or not any(str(n).strip() for n in notes):
+                issues.append(f"{where} 标记 context_inferred 但 notes 为空，必须说明推断依据")
+    return issues
+
+
 def validate_model(model: dict[str, Any]) -> list[str]:
     issues: list[str] = []
     if model.get("schema") != SCHEMA:
@@ -72,8 +110,11 @@ def validate_model(model: dict[str, Any]) -> list[str]:
         for key in ("path", "width_px", "height_px", "sha256"):
             if key not in source:
                 issues.append(f"第 {index} 页 source_image 缺少 {key}")
-        if not isinstance(page.get("questions"), list):
+        questions = page.get("questions")
+        if not isinstance(questions, list):
             issues.append(f"第 {index} 页 questions 必须是数组")
+        else:
+            issues.extend(_validate_questions(index, questions))
 
     if not isinstance(model.get("ambiguities"), list):
         issues.append("ambiguities 必须是数组")
