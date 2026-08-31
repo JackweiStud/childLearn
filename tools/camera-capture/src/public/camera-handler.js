@@ -123,7 +123,7 @@
         UI.setStatus('未检测到任何摄像头设备。', 'warn');
         UI.log('【设备发现提示】未找到任何视频设备。如果您想使用 iPhone 摄像头 (Continuity Camera)，请注意：\n1. 手机需处于锁屏、黑屏状态，且横向放置、保持静止（例如放在支架上）。\n2. 若仍不显示，请在 Mac 上打开 FaceTime 或“照片亭(Photo Booth)”应用，在其视频菜单中选中您的 iPhone 激活连接，然后回到此页面点击“刷新设备”。', 'warn');
       } else {
-        // 选中策略：优先恢复用户之前选过的；否则 USB Camera 优先；否则默认第一项
+        // 选中策略：优先恢复用户之前选过的；否则 OPENAICAM > USB Camera > 第一项
         let bestIndex = -1;
         if (previousValue) {
           for (let i = 0; i < UI.elements.deviceSelect.options.length; i++) {
@@ -134,13 +134,7 @@
           }
         }
         if (bestIndex === -1) {
-          bestIndex = 0;
-          for (let i = 0; i < UI.elements.deviceSelect.options.length; i++) {
-            if (/usb\s*camera/i.test(UI.elements.deviceSelect.options[i].textContent)) {
-              bestIndex = i;
-              break;
-            }
-          }
+          bestIndex = pickPreferredCameraIndex(UI.elements.deviceSelect.options);
         }
         UI.elements.deviceSelect.selectedIndex = bestIndex;
 
@@ -213,12 +207,73 @@
       : '';
   }
 
+  // OPENAICAM 优先，其次旧 USB Camera；分数越小越优先
+  function pickPreferredCameraIndex(options) {
+    let bestIndex = 0;
+    let bestScore = Infinity;
+    for (let i = 0; i < options.length; i++) {
+      const text = options[i].textContent || '';
+      let score = 99;
+      if (/openaicam/i.test(text)) score = 0;
+      else if (/usb\s*camera/i.test(text)) score = 1;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
+  }
+
   // 计算理想分辨率参数
   function getResolutionConstraints() {
     const val = UI.elements.resolutionMode.value;
-    if (val === '720p') return { width: { ideal: 1280 }, height: { ideal: 720 } };
-    if (val === '1080p') return { width: { ideal: 1920 }, height: { ideal: 1080 } };
-    return { width: { ideal: 3840 }, height: { ideal: 2160 } }; // 4K 优先
+    const frameRate = { ideal: 30 };
+    if (val === '720p') return { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate };
+    if (val === '1080p') return { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate };
+    // 最高：对准 OPENAICAM 原生 3840×3032；其他设备由浏览器降到各自最高
+    return { width: { ideal: 3840 }, height: { ideal: 3032 }, frameRate };
+  }
+
+  // 开流后：能拉到更高分辨率就拉；支持连续对焦就默认打开
+  async function applyPreferredHardwareDefaults(track) {
+    if (!track || typeof track.getCapabilities !== 'function') return;
+
+    const caps = track.getCapabilities();
+    const settings = track.getSettings ? track.getSettings() : {};
+
+    if (UI.elements.resolutionMode.value === 'max' && caps.width && caps.height) {
+      const maxW = caps.width.max;
+      const maxH = caps.height.max;
+      const curW = settings.width || 0;
+      const curH = settings.height || 0;
+      if (typeof maxW === 'number' && typeof maxH === 'number' && (maxW > curW || maxH > curH)) {
+        try {
+          await track.applyConstraints({
+            width: { ideal: maxW },
+            height: { ideal: maxH },
+            frameRate: { ideal: 30 }
+          });
+          UI.log(`已将分辨率拉到设备能力上限: ${maxW} × ${maxH}`);
+        } catch (err) {
+          UI.log(`拉到最高分辨率失败: ${err.message}`, 'warn');
+        }
+      }
+    }
+
+    const focusModes = caps.focusMode;
+    const continuousMode = Array.isArray(focusModes)
+      ? focusModes.find((mode) => /continuous/i.test(String(mode)))
+      : '';
+    if (continuousMode) {
+      try {
+        await track.applyConstraints({
+          advanced: [{ focusMode: continuousMode }]
+        });
+        UI.log('已开启连续自动对焦');
+      } catch (err) {
+        UI.log(`开启连续自动对焦失败: ${err.message}`, 'warn');
+      }
+    }
   }
 
   // 开启摄像头
@@ -282,8 +337,10 @@
         window.AnnotationHandler.render();
       }
 
-      // 更新实际分辨率并动态应用画面控制
-      UI.elements.preview.onloadedmetadata = () => {
+      // 更新实际分辨率，尽量拉到设备最高，并打开连续对焦
+      UI.elements.preview.onloadedmetadata = async () => {
+        updateActualResolution();
+        await applyPreferredHardwareDefaults(track);
         updateActualResolution();
         renderAdjustmentPanels(track);
       };

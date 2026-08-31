@@ -45,12 +45,15 @@ test('摄像头开启后按设备能力渲染可用控制项，支持软硬件�
   assert.match(cameraJs, /focusDistance/);
 });
 
-test('拍照台支持 4K 优先采集并显示实际视频流分辨率', () => {
+test('拍照台支持设备原生最高分辨率优先采集并显示实际视频流分辨率', () => {
   assert.match(indexHtml, /id="resolutionMode"/);
   assert.match(indexHtml, /id="actualResolution"/);
-  assert.match(indexHtml, /最高分辨率/);
+  assert.match(indexHtml, /最高分辨率（设备原生）/);
   assert.match(cameraJs, /3840/);
-  assert.match(cameraJs, /2160/);
+  assert.match(cameraJs, /3032/);
+  assert.match(cameraJs, /openaicam/i);
+  assert.match(cameraJs, /focusMode: continuousMode/);
+  assert.match(cameraJs, /applyPreferredHardwareDefaults/);
   assert.match(cameraJs, /updateActualResolution/);
   assert.match(appJs, /resolutionMode\.addEventListener\('change'/);
 });

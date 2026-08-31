@@ -254,24 +254,38 @@ function listAvfoundationVideoDevices() {
   });
 }
 
-function buildAvfoundationCaptureArgs({ deviceIndex, outputPath }) {
-  return [
+const OPENAICAM_VIDEO_SIZE = '3840x3032';
+
+function nativeVideoSizeForDevice(deviceLabel) {
+  return /openaicam/i.test(String(deviceLabel || '')) ? OPENAICAM_VIDEO_SIZE : '';
+}
+
+function buildAvfoundationCaptureArgs({ deviceIndex, outputPath, deviceLabel, videoSize } = {}) {
+  const size = videoSize || nativeVideoSizeForDevice(deviceLabel);
+  const args = [
     '-hide_banner',
     '-y',
     '-f',
     'avfoundation',
     '-framerate',
     '30',
+  ];
+  if (size) {
+    args.push('-video_size', size);
+  }
+  args.push(
     '-i',
     `${deviceIndex}:none`,
     '-frames:v',
     '1',
     outputPath,
-  ];
+  );
+  return args;
 }
 
-function buildAvfoundationPreviewArgs({ deviceIndex }) {
-  return [
+function buildAvfoundationPreviewArgs({ deviceIndex, deviceLabel, videoSize } = {}) {
+  const size = videoSize || nativeVideoSizeForDevice(deviceLabel);
+  const args = [
     '-hide_banner',
     '-loglevel',
     'warning',
@@ -279,6 +293,11 @@ function buildAvfoundationPreviewArgs({ deviceIndex }) {
     'avfoundation',
     '-framerate',
     '30',
+  ];
+  if (size) {
+    args.push('-video_size', size);
+  }
+  args.push(
     '-i',
     `${deviceIndex}:none`,
     '-an',
@@ -291,7 +310,8 @@ function buildAvfoundationPreviewArgs({ deviceIndex }) {
     '-vcodec',
     'mjpeg',
     'pipe:1',
-  ];
+  );
+  return args;
 }
 
 function extractJpegFrames(buffer) {
@@ -369,7 +389,7 @@ async function captureAvfoundationFrame({ deviceIndex, deviceLabel, subject, dif
   try {
     await execFileBuffered(
       'ffmpeg',
-      buildAvfoundationCaptureArgs({ deviceIndex, outputPath: tempImagePath }),
+      buildAvfoundationCaptureArgs({ deviceIndex, outputPath: tempImagePath, deviceLabel }),
       { timeout: 20000 }
     );
     const imageBuffer = fs.readFileSync(tempImagePath);
@@ -430,13 +450,17 @@ function startNativePreviewSession({ deviceIndex, deviceLabel }) {
   }
 
   const sessionId = randomUUID();
-  const ffmpeg = childProcess.spawn('ffmpeg', buildAvfoundationPreviewArgs({ deviceIndex }), {
+  const resolvedLabel = deviceLabel || `AVFoundation Camera ${deviceIndex}`;
+  const ffmpeg = childProcess.spawn('ffmpeg', buildAvfoundationPreviewArgs({
+    deviceIndex,
+    deviceLabel: resolvedLabel,
+  }), {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const session = {
     id: sessionId,
     deviceIndex,
-    deviceLabel: deviceLabel || `AVFoundation Camera ${deviceIndex}`,
+    deviceLabel: resolvedLabel,
     process: ffmpeg,
     latestFrame: null,
     remainder: Buffer.alloc(0),
@@ -659,6 +683,7 @@ if (require.main === module) {
 module.exports = {
   buildAvfoundationCaptureArgs,
   buildAvfoundationPreviewArgs,
+  nativeVideoSizeForDevice,
   extractJpegFrames,
   server,
   decodeDataUrl,

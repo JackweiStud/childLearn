@@ -35,7 +35,7 @@ bash /Users/jackwl/Code/childLearn/mistakeNote/拍照.sh
 
 未来 `englishNote` / `readingNote` 等领域同理——各自写个 `拍照.sh` 套壳即可，工具代码零改动。
 
-浏览器第一次访问会请求摄像头权限。允许后，页面优先选名称含 `USB Camera` 的设备。
+浏览器第一次访问会请求摄像头权限。允许后，页面优先选名称含 `OPENAICAM` 的设备，其次 `USB Camera`。
 
 ## 输出格式
 
@@ -55,7 +55,7 @@ bash /Users/jackwl/Code/childLearn/mistakeNote/拍照.sh
 - 摄像头切换、刷新设备列表
 - **启动后 3 秒自动静默重扫**——捕获 macOS 异步注册的 iPhone（Continuity Camera 经常迟到）
 - **iPhone 未检测时主动提示**——列表里没看到 iPhone 时显示橙色提示卡，列出 5 条 macOS Continuity Camera 触发条件
-- 4K / 1080p / 720p 分辨率切换（native 通道自动灰显，仅 WebRTC 可选）
+- 最高分辨率（设备原生 3840×3032）/ 1080p / 720p 切换（native 通道自动灰显，仅 WebRTC 可选）；支持连续对焦时默认打开
 - 实时预览 + 显示实际分辨率
 - 默认不开摄像头，放好试卷后手动开启
 

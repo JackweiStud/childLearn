@@ -88,6 +88,26 @@ test('构造原生 AVFoundation 单帧抓图命令并解析输出尺寸', () => 
     '/tmp/iphone.jpg',
   ]);
 
+  assert.deepEqual(buildAvfoundationCaptureArgs({
+    deviceIndex: 0,
+    outputPath: '/tmp/openaicam.jpg',
+    deviceLabel: 'OPENAICAM',
+  }), [
+    '-hide_banner',
+    '-y',
+    '-f',
+    'avfoundation',
+    '-framerate',
+    '30',
+    '-video_size',
+    '3840x3032',
+    '-i',
+    '0:none',
+    '-frames:v',
+    '1',
+    '/tmp/openaicam.jpg',
+  ]);
+
   assert.deepEqual(parseFfprobeDimensions('{"streams":[{"width":1920,"height":1440}]}'), {
     width: 1920,
     height: 1440,
@@ -105,6 +125,33 @@ test('构造原生 AVFoundation MJPEG 取景流命令', () => {
     '30',
     '-i',
     '2:none',
+    '-an',
+    '-vf',
+    'fps=10,scale=1280:-2',
+    '-q:v',
+    '7',
+    '-f',
+    'image2pipe',
+    '-vcodec',
+    'mjpeg',
+    'pipe:1',
+  ]);
+
+  assert.deepEqual(buildAvfoundationPreviewArgs({
+    deviceIndex: 0,
+    deviceLabel: 'OPENAICAM',
+  }), [
+    '-hide_banner',
+    '-loglevel',
+    'warning',
+    '-f',
+    'avfoundation',
+    '-framerate',
+    '30',
+    '-video_size',
+    '3840x3032',
+    '-i',
+    '0:none',
     '-an',
     '-vf',
     'fps=10,scale=1280:-2',
